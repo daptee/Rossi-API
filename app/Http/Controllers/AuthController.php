@@ -4,50 +4,42 @@ namespace App\Http\Controllers;
 
 use App\Http\Responses\ApiResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
+use Exception;
+use App\Http\Token\TokenService;
 
 class AuthController extends Controller
 {
-    /**
-     * Login user and create token.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function login(Request $request)
+    protected $tokenService;
+
+    public function __construct(TokenService $tokenService)
     {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required|string',
-        ]);
-
-        $user = User::where('email', $request->email)->first();
-
-        if (! $user || ! Hash::check($request->password, $user->password)) {
-            return ApiResponse::create('Invalid credentials', 401);
-        }
-
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'message' => 'Login successful',
-            'token' => $token,
-        ], 200);
+        $this->tokenService = $tokenService;
     }
 
-    /**
-     * Logout user (Revoke the token).
-     *
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function logout(Request $request)
+    public function login(Request $request)
     {
-        $request->user()->tokens()->delete();
+        try {
+            $request->validate([
+                'email' => 'required|email',
+                'password' => 'required|string',
+            ]);
 
-        return response()->json([
-            'message' => 'Logout successful'
-        ], 200);
+            $user = User::where('email', $request->email)->first();
+
+            if (! $user || ! Hash::check($request->password, $user->password)) {
+                return ApiResponse::create('Invalid credentials', 401);
+            }
+
+            // Generar el token usando el servicio TokenService
+            $token = $this->tokenService->generateToken($user);
+
+            return ApiResponse::create('Login successful', 200, $token);
+
+        } catch (Exception $e) {
+            return ApiResponse::create('Error logging in', 500);
+        }
     }
 }
