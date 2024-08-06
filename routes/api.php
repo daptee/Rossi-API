@@ -1,19 +1,23 @@
 <?php
-
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\ProductCategoryController;
-
-Route::get('/', function () {
-    return 'welcome';
+ 
+ use Illuminate\Support\Facades\Route;
+ use App\Http\Controllers\AuthController;
+ use App\Http\Controllers\ProductCategoryController;
+ 
+ // Rutas de autenticación
+Route::group([
+    'middleware' => 'api',
+    'prefix' => 'auth'
+], function () {
+    Route::post('/login', [AuthController::class, 'login'])->name('login');
 });
 
-Route::post('/users', [UserController::class, 'store']);
-
-Route::post('/login', [AuthController::class, 'login']);
-
-Route::get('/categories', [ProductCategoryController::class, 'index']);
-Route::post('/categories', [ProductCategoryController::class, 'store']);
-Route::put('/categories/{id}', [ProductCategoryController::class, 'update']);
+ // Rutas de categorías
+Route::group([
+    'middleware' => 'api',
+    'prefix' => 'categories'
+], function () {
+    Route::get('/', [ProductCategoryController::class, 'index']);
+    Route::post('/', [ProductCategoryController::class, 'store'])->middleware('admin');
+    Route::put('/{id}', [ProductCategoryController::class, 'update'])->middleware('admin');
+});

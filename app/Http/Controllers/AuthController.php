@@ -42,4 +42,13 @@ class AuthController extends Controller
             return ApiResponse::create('Error al iniciar sesión', 500);
         }
     }
+    /**
+     * Get the authenticated User.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function me()
+    {
+        return response()->json(auth()->user());
+    }
 }

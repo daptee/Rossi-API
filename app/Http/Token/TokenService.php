@@ -2,7 +2,7 @@
 
 namespace App\Http\Token;
 
-use Tymon\JWTAuth\Facades\JWTAuth;
+use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 use App\Models\User;
 
 class TokenService
@@ -33,7 +33,6 @@ class TokenService
             'name' => $user->name,
             'lastname' => $user->lastname,
             'email' => $user->email,
-            // Agrega aquí cualquier otro campo que quieras incluir
         ];
     }
 }
