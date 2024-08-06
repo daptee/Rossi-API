@@ -1,14 +1,23 @@
 <?php
-
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\AuthController;
-
-Route::get('/', function () {
-    return 'welcome';
+ 
+ use Illuminate\Support\Facades\Route;
+ use App\Http\Controllers\AuthController;
+ use App\Http\Controllers\ProductCategoryController;
+ 
+ // Rutas de autenticación
+Route::group([
+    'middleware' => 'api',
+    'prefix' => 'auth'
+], function () {
+    Route::post('/login', [AuthController::class, 'login'])->name('login');
 });
 
-Route::post('/users', [UserController::class, 'store']);
-
-Route::post('/login', [AuthController::class, 'login']);
+ // Rutas de categorías
+Route::group([
+    'middleware' => 'api',
+    'prefix' => 'categories'
+], function () {
+    Route::get('/', [ProductCategoryController::class, 'index']);
+    Route::post('/', [ProductCategoryController::class, 'store'])->middleware('admin');
+    Route::put('/{id}', [ProductCategoryController::class, 'update'])->middleware('admin');
+});

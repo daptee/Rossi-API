@@ -16,12 +16,8 @@ class ApiResponse
     {
         $response = [
             'message' => $message,
-            'data' => $result,
+            'data' => empty($result) ? null : $result, // Establecer data como null si result está vacío
         ];
-
-        if ($code !== 200) {
-            $response['code'] = $code;
-        }
 
         return response()->json($response, $code);
     }

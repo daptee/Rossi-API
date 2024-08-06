@@ -1,16 +1,17 @@
 <?php
-
+ 
 namespace App\Models;
-
+ 
+// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Facades\Hash;
-use Tymon\JWTAuth\Contracts\JWTSubject; // Importa la interfaz JWTSubject
-
-class User extends Authenticatable implements JWTSubject // Implementa JWTSubject
+use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject; 
+ 
+class User extends Authenticatable implements JWTSubject
 {
-    use Notifiable;
-
+    use HasFactory, Notifiable;
+ 
     protected $fillable = [
         'name', 'lastname', 'email', 'password', 'id_user_type',
     ];
@@ -31,11 +32,12 @@ class User extends Authenticatable implements JWTSubject // Implementa JWTSubjec
      *
      * @return mixed
      */
+
     public function getJWTIdentifier()
     {
-        return $this->getKey(); // Devuelve la clave del usuario
+        return $this->getKey();
     }
-
+ 
     /**
      * Return a key value array, containing any custom claims to be added to the JWT.
      *
@@ -43,6 +45,6 @@ class User extends Authenticatable implements JWTSubject // Implementa JWTSubjec
      */
     public function getJWTCustomClaims()
     {
-        return []; // Devuelve un array de claims personalizados, si es necesario
+        return [];
     }
 }
