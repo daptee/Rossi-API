@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Responses\ApiResponse;
 use Illuminate\Http\Request;
 use App\Models\Material;
+use App\Models\MaterialValue;
 use Illuminate\Support\Facades\Validator;
 use Exception;
 
@@ -27,7 +28,11 @@ class MaterialController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'id_material' => 'nullable|exists:materials,id',
-                'name' => 'required|string|max:255'
+                'name' => 'required|string|max:255',
+                'values' => 'nullable|array',
+                'values.*.value' => 'required_with:values|string|max:255',
+                'values.*.img' => 'nullable|string|max:255',
+                'values.*.code' => 'nullable|string|max:255'
             ]);
 
             if ($validator->fails()) {
@@ -35,7 +40,15 @@ class MaterialController extends Controller
             }
 
             $material = Material::create($request->only('id_material', 'name'));
-                
+
+            if ($request->has('values')) {
+                foreach ($request->values as $valueData) {
+                    $valueData['id_material'] = $material->id;
+                    MaterialValue::create($valueData);
+                }
+            }
+
+            $material->load('values');
             return ApiResponse::create('Material creado correctamente', 200, $material);
         } catch (Exception $e) {
             return ApiResponse::create('Error al crear un material', 500, ['error' => $e->getMessage()]);
@@ -47,7 +60,12 @@ class MaterialController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'id_material' => 'nullable|exists:materials,id',
-                'name' => 'required|string|max:255'
+                'name' => 'required|string|max:255',
+                'values' => 'nullable|array',
+                'values.*.id' => 'sometimes|exists:material_values,id',
+                'values.*.value' => 'required_with:values|string|max:255',
+                'values.*.img' => 'nullable|string|max:255',
+                'values.*.code' => 'nullable|string|max:255'
             ]);
 
             if ($validator->fails()) {
@@ -56,7 +74,20 @@ class MaterialController extends Controller
 
             $material = Material::findOrFail($id);
             $material->update($request->only('id_material', 'name'));
-                
+
+            if ($request->has('values')) {
+                foreach ($request->values as $valueData) {
+                    if (isset($valueData['id'])) {
+                        $value = MaterialValue::findOrFail($valueData['id']);
+                        $value->update($valueData);
+                    } else {
+                        $valueData['id_material'] = $material->id;
+                        MaterialValue::create($valueData);
+                    }
+                }
+            }
+
+            $material->load('values');
             return ApiResponse::create('Material actualizado correctamente', 200, $material);
         } catch (Exception $e) {
             return ApiResponse::create('Error al actualizar un material', 500, ['error' => $e->getMessage()]);
