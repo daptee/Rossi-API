@@ -1,5 +1,6 @@
 <?php
  
+ use App\Http\Controllers\AttributeController;
  use Illuminate\Support\Facades\Route;
  use App\Http\Controllers\AuthController;
  use App\Http\Controllers\ProductCategoryController;
@@ -32,4 +33,15 @@ Route::group([
     Route::get('/', [MaterialController::class, 'index']);
     Route::post('/', [MaterialController::class, 'store'])->middleware('admin');
     Route::put('/{id}', [MaterialController::class, 'update'])->middleware('admin');
+});
+
+// Rutas de atributos
+
+Route::group([
+    'middleware' => 'api',
+    'prefix' => 'attributes'
+], function () {
+    Route::get('/', [AttributeController::class, 'index']);
+    Route::post('/', [AttributeController::class, 'store'])->middleware('admin');
+    Route::put('/{id}', [AttributeController::class, 'update'])->middleware('admin');
 });
