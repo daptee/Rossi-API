@@ -3,6 +3,7 @@
  use Illuminate\Support\Facades\Route;
  use App\Http\Controllers\AuthController;
  use App\Http\Controllers\ProductCategoryController;
+ use App\Http\Controllers\MaterialController;
  
  // Rutas de autenticación
 Route::group([
@@ -20,4 +21,15 @@ Route::group([
     Route::get('/', [ProductCategoryController::class, 'index']);
     Route::post('/', [ProductCategoryController::class, 'store'])->middleware('admin');
     Route::put('/{id}', [ProductCategoryController::class, 'update'])->middleware('admin');
+});
+
+// Rutas de materiales
+
+Route::group([
+    'middleware' => 'api',
+    'prefix' => 'materials'
+], function () {
+    Route::get('/', [MaterialController::class, 'index']);
+    Route::post('/', [MaterialController::class, 'store'])->middleware('admin');
+    Route::put('/{id}', [MaterialController::class, 'update'])->middleware('admin');
 });
