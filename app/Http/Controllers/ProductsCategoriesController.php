@@ -6,15 +6,15 @@ use App\Http\Responses\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Exception;
-use App\Models\ProductCategory;
+use App\Models\ProductsCategories;
 
-class ProductCategoryController extends Controller
+class ProductsCategoriesController extends Controller
 {
     // GET ALL
     public function index()
     {
         try {
-            $categories = ProductCategory::all();
+            $categories = ProductsCategories::all();
             return ApiResponse::create('Succeeded', 200, $categories);
         } catch (Exception $e) {
             return ApiResponse::create('Error al traer todas las caterogias', 500);
@@ -39,7 +39,7 @@ class ProductCategoryController extends Controller
                 return ApiResponse::create('Validation failed', 422, $validator->errors());
             }
     
-            $category = new ProductCategory([
+            $category = new ProductsCategories([
                 'id_category' => $request->input('id_category'),
                 'category' => $request->input('category'),
                 'img' => $request->input('img'),
@@ -76,7 +76,7 @@ class ProductCategoryController extends Controller
             };
             
 
-            $category = ProductCategory::findOrFail($id);
+            $category = ProductsCategories::findOrFail($id);
 
             $category->update($request->only([
                 'id_category',

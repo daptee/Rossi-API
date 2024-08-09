@@ -1,27 +1,22 @@
 <?php
 
+// app/Models/ProductGallery.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class ProductCategory extends Model
+class ProductGallery extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'id_product',
-        'id_categorie',
+        'id_product', // Asegúrate de que se llame 'id_product'
+        'file',
     ];
 
     public function product()
     {
         return $this->belongsTo(Product::class, 'id_product');
     }
-
-    public function category()
-    {
-        return $this->belongsTo(ProductCategory::class, 'id_categorie');
-    }
 }
-
