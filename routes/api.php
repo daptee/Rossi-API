@@ -1,6 +1,7 @@
 <?php
  
  use App\Http\Controllers\AttributeController;
+ use App\Http\Controllers\DistributorController;
  use App\Http\Controllers\ProductController;
  use Illuminate\Support\Facades\Route;
  use App\Http\Controllers\AuthController;
@@ -47,7 +48,7 @@ Route::group([
     Route::put('/{id}', [AttributeController::class, 'update'])->middleware('admin');
 });
 
-// Rutas de atributos
+// Rutas de productos
 
 Route::group([
     'middleware' => 'api',
@@ -58,4 +59,15 @@ Route::group([
     Route::get('/{id}', [ProductController::class, 'indexProduct'])->middleware('admin');
     Route::post('/', [ProductController::class, 'store'])->middleware('admin');
     Route::post('/{id}', [ProductController::class, 'update'])->middleware('admin');
+});
+
+// Rutas de distribuidores
+
+Route::group([
+    'middleware' => 'api',
+    'prefix' => 'distributor'
+], function () {
+    Route::get('/', [DistributorController::class, 'index']);
+    Route::post('/', [DistributorController::class, 'store'])->middleware('admin');
+    Route::put('/{id}', [DistributorController::class, 'update'])->middleware('admin');
 });

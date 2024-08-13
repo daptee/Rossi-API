@@ -191,7 +191,7 @@ class ProductController extends Controller
                 return ApiResponse::create('Validation failed', 422, $validator->errors());
             }
 
-            $product = Product::findOrFail($id);
+            $product = Product::with('attributes')->findOrFail($id);
 
             // Actualizar y eliminar imágenes si es necesario
             if ($request->hasFile('main_img')) {
@@ -236,15 +236,24 @@ class ProductController extends Controller
 
             // Actualizar los atributos asociados al producto
             if ($request->has('attributes_values')) {
+                // Eliminar todos los atributos existentes del producto
                 foreach ($product->attributes as $attribute) {
-                    if ($request->hasFile("attributes_values.{$attribute->id}.img")) {
-                        Storage::delete($attribute->img);
-                        $attribute->img = $request->file("attributes_values.{$attribute->id}.img")->store('products/attributes');
+                    if ($attribute->pivot->img) {
+                        Storage::delete($attribute->pivot->img);
                     }
-                    $attribute->update($request->only("attributes_values.{$attribute->id}.id_attribute_value"));
+                }
+                $product->attributes()->detach();
+    
+                // Crear nuevos atributos
+                foreach ($request->attributes_values as $index => $attribute) {
+                    $attributeImgPath = $request->hasFile("attributes_values.$index.img")
+                        ? $request->file("attributes_values.$index.img")->store('products/attributes')
+                        : null;
+    
+                    $product->attributes()->attach($attribute['id_attribute_value'], ['img' => $attributeImgPath]);
                 }
             }
-
+    
             return ApiResponse::create('Product updated successfully', 200, $product);
         } catch (Exception $e) {
             return ApiResponse::create('Error al actualizar producto', 500, ['error' => $e->getMessage()]);
