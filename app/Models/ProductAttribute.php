@@ -1,17 +1,19 @@
 <?php
 
+// app/Models/ProductAttribute.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class ProductCategory extends Model
+class ProductAttribute extends Model
 {
     use HasFactory;
 
     protected $fillable = [
         'id_product',
-        'id_categorie',
+        'id_attribute_value',
+        'img',
     ];
 
     public function product()
@@ -19,9 +21,8 @@ class ProductCategory extends Model
         return $this->belongsTo(Product::class, 'id_product');
     }
 
-    public function category()
+    public function attribute()
     {
-        return $this->belongsTo(ProductCategory::class, 'id_categorie');
+        return $this->belongsTo(AttributeValue::class, 'id_attribute');
     }
 }
-

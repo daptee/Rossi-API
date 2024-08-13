@@ -1,17 +1,18 @@
 <?php
 
+// app/Models/ProductMaterial.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class ProductCategory extends Model
+class ProductMaterial extends Model
 {
     use HasFactory;
 
     protected $fillable = [
         'id_product',
-        'id_categorie',
+        'id_material',
     ];
 
     public function product()
@@ -19,9 +20,8 @@ class ProductCategory extends Model
         return $this->belongsTo(Product::class, 'id_product');
     }
 
-    public function category()
+    public function material()
     {
-        return $this->belongsTo(ProductCategory::class, 'id_categorie');
+        return $this->belongsTo(Material::class, 'id_material');
     }
 }
-
