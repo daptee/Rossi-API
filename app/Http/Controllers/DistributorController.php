@@ -20,7 +20,7 @@ class DistributorController extends Controller
 
             return ApiResponse::create('Succeeded', 200, $distributors);
         } catch (Exception $e) {
-            return ApiResponse::create('Error al obtener productos', 500, ['error' => $e->getMessage()]);
+            return ApiResponse::create('Error al obtener los distribuidores', 500, ['error' => $e->getMessage()]);
         }
     }
 
@@ -46,7 +46,7 @@ class DistributorController extends Controller
 
             $distributor = Distributor::create($request->all());
 
-            return ApiResponse::create('Distributor created successfully', 200, $distributor);
+            return ApiResponse::create('Distribuitor creado con exito', 200, $distributor);
         } catch (Exception $e) {
             return ApiResponse::create('Error al crear un distribuidor', 500, ['error' => $e->getMessage()]);
         }
@@ -78,7 +78,7 @@ class DistributorController extends Controller
             $distributor = Distributor::find($id);
             $distributor->update($request->all());
     
-            return ApiResponse::create('Distributor updated successfully', 200, $distributor);
+            return ApiResponse::create('Distribuidor actualizado con exito', 200, $distributor);
         } catch (Exception $e) {
             return ApiResponse::create('Error al actualizar un distribuidor', 500, ['error' => $e->getMessage()]);
         }

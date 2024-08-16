@@ -18,6 +18,7 @@ class Product extends Model
         'main_img',
         'main_video',
         'file_data_sheet',
+        'featured'
     ];
 
     public function attributes()

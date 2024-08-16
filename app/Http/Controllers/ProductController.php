@@ -20,7 +20,7 @@ class ProductController extends Controller
     public function indexAdmin()
     {
         try {
-            $products = Product::select('id', 'name', 'main_img', 'status')
+            $products = Product::select('id', 'name', 'main_img', 'status', 'featured')
             ->withCount(['categories', 'materials', 'attributes', 'gallery'])
             ->get();
 
@@ -31,6 +31,7 @@ class ProductController extends Controller
                     'name' => $product->name,
                     'main_img' => $product->main_img,
                     'status' => $product->status,
+                    'featured' => $product->featured,
                     'categories_count' => $product->categories_count,
                     'materials_count' => $product->materials_count,
                     'attributes_count' => $product->attributes_count,
@@ -40,7 +41,7 @@ class ProductController extends Controller
 
             return ApiResponse::create('Succeeded', 200, $products);
         } catch (Exception $e) {
-            return ApiResponse::create('Error al obtener productos', 500, ['error' => $e->getMessage()]);
+            return ApiResponse::create('Error al obtener los productos', 500, ['error' => $e->getMessage()]);
         }
     }
 
@@ -49,12 +50,12 @@ class ProductController extends Controller
     {
         try {
             $products = Product::where('status', 2) // Assuming 2 is the ID for "Activo"
-                ->select('id', 'name', 'slug', 'main_img')
+                ->select('id', 'name', 'slug', 'main_img', 'featured')
                 ->get();
 
             return ApiResponse::create('Succeeded', 200, $products);
         } catch (Exception $e) {
-            return ApiResponse::create('Error al obtener productos', 500, ['error' => $e->getMessage()]);
+            return ApiResponse::create('Error al obtener los productos', 500, ['error' => $e->getMessage()]);
         }
     }
 
@@ -63,12 +64,12 @@ class ProductController extends Controller
     {
         try {
             $products = Product::with(['categories', 'materials', 'attributes', 'gallery'])
-                ->select('id', 'name', 'main_img', 'status')
+                ->select('id', 'name', 'description', 'main_img', 'main_video', 'file_data_sheet', 'status', 'featured')
                 ->findOrFail($id);
 
             return ApiResponse::create('Succeeded', 200, $products);
         } catch (Exception $e) {
-            return ApiResponse::create('Error al obtener productos', 500, ['error' => $e->getMessage()]);
+            return ApiResponse::create('Error al obtener el producto', 500, ['error' => $e->getMessage()]);
         }
     }
 
@@ -86,6 +87,7 @@ class ProductController extends Controller
                 'main_img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
                 'main_video' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
                 'file_data_sheet' => 'nullable|file|mimes:pdf|max:5120',
+                'featured' => 'nullable|boolean',
                 'categories' => 'array',
                 'categories.*' => 'integer|exists:products_categories,id',
                 'gallery' => 'array',
@@ -115,6 +117,7 @@ class ProductController extends Controller
                 'main_img' => $mainImgPath,
                 'main_video' => $mainVideoPath,
                 'file_data_sheet' => $fileDataSheetPath,
+                'featured' => $request->featured,
             ]);
 
             // Guardar imágenes en la galería
@@ -154,7 +157,7 @@ class ProductController extends Controller
                 }
             }
 
-            return ApiResponse::create('Product created successfully', 200, $product);
+            return ApiResponse::create('Producto creado correctamente', 200, $product);
         } catch (Exception $e) {
             return ApiResponse::create('Error al crear producto', 500, ['error' => $e->getMessage()]);
         }
@@ -176,6 +179,7 @@ class ProductController extends Controller
                 'main_img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
                 'main_video' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
                 'file_data_sheet' => 'nullable|file|mimes:pdf|max:5120',
+                'featured' => 'nullable|boolean',
                 'categories' => 'array',
                 'categories.*' => 'integer|exists:products_categories,id',
                 'gallery' => 'array',
@@ -209,7 +213,7 @@ class ProductController extends Controller
                 $product->file_data_sheet = $request->file('file_data_sheet')->store('products/data_sheets');
             }
 
-            $product->update($request->only('name', 'sku', 'slug', 'description', 'status'));
+            $product->update($request->only('name', 'sku', 'slug', 'description', 'status', 'featured'));
 
             // Actualizar las categorías asociadas al producto
             if ($request->has('categories')) {
@@ -254,7 +258,7 @@ class ProductController extends Controller
                 }
             }
     
-            return ApiResponse::create('Product updated successfully', 200, $product);
+            return ApiResponse::create('Product actualizado successfully', 200, $product);
         } catch (Exception $e) {
             return ApiResponse::create('Error al actualizar producto', 500, ['error' => $e->getMessage()]);
         }

@@ -1,5 +1,11 @@
 USE rossi_equipamientos;
 
+SET FOREIGN_KEY_CHECKS = 0;
+
+DROP TABLE IF EXISTS products, product_status, product_galleries, product_categories, product_materials, product_attributes;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
 CREATE TABLE products (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -10,6 +16,7 @@ CREATE TABLE products (
     main_img VARCHAR(255),
     main_video VARCHAR(255),
     file_data_sheet VARCHAR(255),
+    featured BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -49,7 +56,6 @@ CREATE TABLE product_materials (
     id INT AUTO_INCREMENT PRIMARY KEY,
     id_product INT,
     id_material INT,
-    value VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (id_product) REFERENCES products(id) ON DELETE CASCADE,
@@ -60,11 +66,10 @@ CREATE TABLE product_materials (
 CREATE TABLE product_attributes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     id_product INT,
-    id_attribute INT,
-    value VARCHAR(255),
+    id_attribute_value INT,
     img VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (id_product) REFERENCES products(id) ON DELETE CASCADE,
-    FOREIGN KEY (id_attribute) REFERENCES attributes(id) ON DELETE CASCADE
+    FOREIGN KEY (id_attribute_value) REFERENCES attributes(id) ON DELETE CASCADE
 );
