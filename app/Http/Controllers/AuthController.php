@@ -39,7 +39,7 @@ class AuthController extends Controller
             return ApiResponse::create('Inicio de sesión exitoso', 200, $token);
 
         } catch (Exception $e) {
-            return ApiResponse::create('Error al iniciar sesión', 500);
+            return ApiResponse::create('Error al iniciar sesión', 500, ['error' => $e->getMessage()]);
         }
     }
     /**
