@@ -17,7 +17,7 @@ class ProductsCategoriesController extends Controller
             $categories = ProductsCategories::all();
             return ApiResponse::create('Succeeded', 200, $categories);
         } catch (Exception $e) {
-            return ApiResponse::create('Error al traer todas las caterogias', 500);
+            return ApiResponse::create('Error al traer todas las caterogias', 500, ['error' => $e->getMessage()]);
         }    
     }
 
@@ -53,7 +53,7 @@ class ProductsCategoriesController extends Controller
             
             return ApiResponse::create('Categoria creada correctamente', 200, $category);
         } catch (Exception $e) {
-            return ApiResponse::create('Error al crear una categoria', 500);
+            return ApiResponse::create('Error al crear una categoria', 500, ['error' => $e->getMessage()]);
         } 
     }
 
@@ -90,7 +90,7 @@ class ProductsCategoriesController extends Controller
 
             return ApiResponse::create('Categoria actualizada correctamente', 200, $category);
         } catch (Exception $e) {
-            return ApiResponse::create('Error al actualizar una categoria', 500);
+            return ApiResponse::create('Error al actualizar una categoria', 500, ['error' => $e->getMessage()]);
         }
     }
 }

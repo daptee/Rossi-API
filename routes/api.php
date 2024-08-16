@@ -3,6 +3,7 @@
  use App\Http\Controllers\AttributeController;
  use App\Http\Controllers\DistributorController;
  use App\Http\Controllers\ProductController;
+ use App\Http\Controllers\WebContentHomeController;
  use Illuminate\Support\Facades\Route;
  use App\Http\Controllers\AuthController;
  use App\Http\Controllers\ProductsCategoriesController;
@@ -56,7 +57,7 @@ Route::group([
 ], function () {
     Route::get('/admin', [ProductController::class, 'indexAdmin'])->middleware('admin');
     Route::get('/', [ProductController::class, 'indexWeb']);
-    Route::get('/{id}', [ProductController::class, 'indexProduct'])->middleware('admin');
+    Route::get('/{id}', [ProductController::class, 'indexProduct']);
     Route::post('/', [ProductController::class, 'store'])->middleware('admin');
     Route::post('/{id}', [ProductController::class, 'update'])->middleware('admin');
 });
@@ -70,4 +71,15 @@ Route::group([
     Route::get('/', [DistributorController::class, 'index']);
     Route::post('/', [DistributorController::class, 'store'])->middleware('admin');
     Route::put('/{id}', [DistributorController::class, 'update'])->middleware('admin');
+});
+
+// Rutas del contenido de la web
+
+Route::group([
+    'middleware' => 'api',
+    'prefix' => 'web-content-home'
+], function () {
+    Route::get('/', [WebContentHomeController::class, 'index']);
+    Route::post('/', [WebContentHomeController::class, 'store'])->middleware('admin');
+    Route::put('/{id}', [WebContentHomeController::class, 'update'])->middleware('admin');
 });
