@@ -1,0 +1,11 @@
+USE rossi_equipamientos;
+
+CREATE TABLE web_content_about (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    date DATE NOT NULL,
+    id_user BIGINT UNSIGNED NOT NULL,
+    data JSON NOT NULL,
+    CONSTRAINT fk_user_id_about FOREIGN KEY (id_user) REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
