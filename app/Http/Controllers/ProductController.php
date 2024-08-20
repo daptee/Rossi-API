@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Responses\ApiResponse;
+use App\Models\ProductComponent;
 use Illuminate\Http\Request;
 use App\Models\Product;
 use App\Models\ProductCategory;
@@ -10,7 +11,7 @@ use App\Models\ProductMaterial;
 use App\Models\ProductAttribute;
 use App\Models\ProductGallery;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Log; 
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Exception;
 
@@ -21,8 +22,8 @@ class ProductController extends Controller
     {
         try {
             $products = Product::select('id', 'name', 'main_img', 'status', 'featured')
-            ->withCount(['categories', 'materials', 'attributes', 'gallery'])
-            ->get();
+                ->withCount(['categories', 'materials', 'attributes', 'gallery', 'components'])
+                ->get();
 
             // Mapea cada producto para devolver solo los conteos y la información básica
             $products = $products->map(function ($product) {
@@ -35,6 +36,7 @@ class ProductController extends Controller
                     'categories_count' => $product->categories_count,
                     'materials_count' => $product->materials_count,
                     'attributes_count' => $product->attributes_count,
+                    'components_count' => $product->components_count,
                     'gallery_count' => $product->gallery_count,
                 ];
             });
@@ -46,12 +48,19 @@ class ProductController extends Controller
     }
 
     // GET ALL (para web)
-    public function indexWeb()
+    public function indexWeb(Request $request)
     {
         try {
-            $products = Product::where('status', 2) // Assuming 2 is the ID for "Activo"
-                ->select('id', 'name', 'slug', 'main_img', 'featured')
-                ->get();
+            $featured = $request->query('featured');
+
+            $query = Product::where('status', 2)
+                ->select('id', 'name', 'slug', 'main_img', 'featured');
+
+            if ($featured !== null) {
+                $query->where('featured', $featured);
+            }
+
+            $products = $query->get();
 
             return ApiResponse::create('Succeeded', 200, $products);
         } catch (Exception $e) {
@@ -59,19 +68,44 @@ class ProductController extends Controller
         }
     }
 
+
     // GET PRODUCT
     public function indexProduct($id)
     {
         try {
-            $products = Product::with(['categories', 'materials', 'attributes', 'gallery'])
+            $products = Product::with([
+                'categories',
+                'materials.material',
+                'attributes.attribute',
+                'gallery',
+                'components'
+            ])
                 ->select('id', 'name', 'description', 'main_img', 'main_video', 'file_data_sheet', 'status', 'featured')
                 ->findOrFail($id);
+
+            $products->categories->each(function ($category) {
+                unset($category->pivot);
+            });
+
+            $products->materials->each(function ($material) {
+                unset($material->pivot);
+            });
+
+            $products->attributes->each(function ($attribute) {
+                $attribute->img = $attribute->pivot->img;
+                unset($attribute->pivot);
+            });
+
+            $products->components->each(function ($component) {
+                unset($component->pivot);
+            });
 
             return ApiResponse::create('Succeeded', 200, $products);
         } catch (Exception $e) {
             return ApiResponse::create('Error al obtener el producto', 500, ['error' => $e->getMessage()]);
         }
     }
+
 
     // POST - Crear un nuevo producto
     public function store(Request $request)
@@ -97,6 +131,8 @@ class ProductController extends Controller
                 'attributes_values' => 'array',
                 'attributes_values.*.id_attribute_value' => 'required|integer|exists:attribute_values,id',
                 'attributes_values.*.img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
+                'components' => 'array',
+                'components.*' => 'integer|exists:components,id',
             ]);
 
             if ($validator->fails()) {
@@ -157,6 +193,13 @@ class ProductController extends Controller
                 }
             }
 
+            // Guardar componentes asociados al producto
+            if ($request->has('components')) {
+                foreach ($request->components as $componentId) {
+                    ProductComponent::create(['id_product' => $product->id, 'id_component' => $componentId]);
+                }
+            }
+
             return ApiResponse::create('Producto creado correctamente', 200, $product);
         } catch (Exception $e) {
             return ApiResponse::create('Error al crear producto', 500, ['error' => $e->getMessage()]);
@@ -169,7 +212,7 @@ class ProductController extends Controller
     {
         try {
             Log::info('Request Data:', $request->all());
-            
+
             $validator = Validator::make($request->all(), [
                 'name' => 'required|string|max:255',
                 'sku' => 'required|string|max:100|unique:products,sku,' . $id,
@@ -247,17 +290,21 @@ class ProductController extends Controller
                     }
                 }
                 $product->attributes()->detach();
-    
+
                 // Crear nuevos atributos
                 foreach ($request->attributes_values as $index => $attribute) {
                     $attributeImgPath = $request->hasFile("attributes_values.$index.img")
                         ? $request->file("attributes_values.$index.img")->store('products/attributes')
                         : null;
-    
+
                     $product->attributes()->attach($attribute['id_attribute_value'], ['img' => $attributeImgPath]);
                 }
+
+                if ($request->has('components')) {
+                    $product->components()->sync($request->components);
+                }
             }
-    
+
             return ApiResponse::create('Product actualizado successfully', 200, $product);
         } catch (Exception $e) {
             return ApiResponse::create('Error al actualizar producto', 500, ['error' => $e->getMessage()]);
