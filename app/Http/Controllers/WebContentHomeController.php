@@ -26,32 +26,38 @@ class WebContentHomeController extends Controller
         try {
             $user = JWTAuth::parseToken()->authenticate();
 
-            $validator = Validator::make($request->all(), [
+            $encodedData = json_encode($request->data);
+
+            $validator = Validator::make(['data' => $encodedData], [
                 'data' => 'required|json',
             ]);
-    
+
             if ($validator->fails()) {
                 return ApiResponse::create('Validation failed', 422, $validator->errors());
             }
-    
+
+            $decodedData = json_decode($encodedData, true);
+
             $webContent = WebContentHome::create([
-                'date' => now(),
                 'id_user' => $user->id,
-                'data' => $request->data,
+                'data' => $decodedData,
             ]);
-            
+
             return ApiResponse::create('Contenido de la web creado correctamente', 200, $webContent);
         } catch (Exception $e) {
             return ApiResponse::create('Error al crear el contenido de la web', 500, ['error' => $e->getMessage()]);
         }
     }
 
+
     public function update(Request $request, $id)
     {
         try {
             $user = JWTAuth::parseToken()->authenticate();
 
-            $validator = Validator::make($request->all(), [
+            $encodedData = json_encode($request->data);
+
+            $validator = Validator::make(['data' => $encodedData], [
                 'data' => 'required|json',
             ]);
 
@@ -59,12 +65,13 @@ class WebContentHomeController extends Controller
                 return ApiResponse::create('Validation failed', 422, $validator->errors());
             }
 
+            $decodedData = json_decode($encodedData, true);
+
             $webContent = WebContentHome::findOrFail($id);
 
             $webContent->update([
-                'date' => now(),
                 'id_user' => $user->id,
-                'data' => $request->data,
+                'data' => $decodedData,
             ]);
 
             return ApiResponse::create('Contenido de la web actualizado correctamente', 200, $webContent);

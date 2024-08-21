@@ -17,7 +17,7 @@ class ComponentController extends Controller
             $webContent = Component::all();
             return ApiResponse::create('Succeeded', 200, $webContent);
         } catch (Exception $e) {
-            return ApiResponse::create('Error al traer el contenido sobre nosotros de la web', 500, ['error' => $e->getMessage()]);
+            return ApiResponse::create('Error al traer los componentes', 500, ['error' => $e->getMessage()]);
         }
     }
 

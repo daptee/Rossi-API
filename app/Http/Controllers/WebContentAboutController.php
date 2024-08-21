@@ -26,18 +26,21 @@ class WebContentAboutController extends Controller
         try {
             $user = JWTAuth::parseToken()->authenticate();
 
-            $validator = Validator::make($request->all(), [
+            $encodedData = json_encode($request->data);
+
+            $validator = Validator::make(['data' => $encodedData], [
                 'data' => 'required|json',
             ]);
-    
+
             if ($validator->fails()) {
                 return ApiResponse::create('Validation failed', 422, $validator->errors());
             }
-    
+
+            $decodedData = json_decode($encodedData, true);
+
             $webContent = WebContentAbout::create([
-                'date' => now(),
                 'id_user' => $user->id,
-                'data' => $request->data,
+                'data' => $decodedData,
             ]);
             
             return ApiResponse::create('Contenido sobre nosotros de la web creado correctamente', 200, $webContent);
@@ -51,7 +54,9 @@ class WebContentAboutController extends Controller
         try {
             $user = JWTAuth::parseToken()->authenticate();
 
-            $validator = Validator::make($request->all(), [
+            $encodedData = json_encode($request->data);
+
+            $validator = Validator::make(['data' => $encodedData], [
                 'data' => 'required|json',
             ]);
 
@@ -59,12 +64,13 @@ class WebContentAboutController extends Controller
                 return ApiResponse::create('Validation failed', 422, $validator->errors());
             }
 
+            $decodedData = json_decode($encodedData, true);
+
             $webContent = WebContentAbout::findOrFail($id);
 
             $webContent->update([
-                'date' => now(),
                 'id_user' => $user->id,
-                'data' => $request->data,
+                'data' => $decodedData,
             ]);
 
             return ApiResponse::create('Contenido sobre nosotros de la web actualizado correctamente', 200, $webContent);
