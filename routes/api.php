@@ -3,6 +3,7 @@
  use App\Http\Controllers\AttributeController;
  use App\Http\Controllers\DistributorController;
  use App\Http\Controllers\ProductController;
+ use App\Http\Controllers\WebContentAboutController;
  use App\Http\Controllers\WebContentHomeController;
  use Illuminate\Support\Facades\Route;
  use App\Http\Controllers\AuthController;
@@ -82,4 +83,15 @@ Route::group([
     Route::get('/', [WebContentHomeController::class, 'index']);
     Route::post('/', [WebContentHomeController::class, 'store'])->middleware('admin');
     Route::put('/{id}', [WebContentHomeController::class, 'update'])->middleware('admin');
+});
+
+// Rutas del contenido sobre nosotros de la web
+
+Route::group([
+    'middleware' => 'api',
+    'prefix' => 'web-content-about'
+], function () {
+    Route::get('/', [WebContentAboutController::class, 'index']);
+    Route::post('/', [WebContentAboutController::class, 'store'])->middleware('admin');
+    Route::put('/{id}', [WebContentAboutController::class, 'update'])->middleware('admin');
 });
