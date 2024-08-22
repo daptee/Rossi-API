@@ -1,6 +1,7 @@
 <?php
  
  use App\Http\Controllers\AttributeController;
+ use App\Http\Controllers\ComponentController;
  use App\Http\Controllers\DistributorController;
  use App\Http\Controllers\ProductController;
  use App\Http\Controllers\WebContentAboutController;
@@ -94,4 +95,15 @@ Route::group([
     Route::get('/', [WebContentAboutController::class, 'index']);
     Route::post('/', [WebContentAboutController::class, 'store'])->middleware('admin');
     Route::put('/{id}', [WebContentAboutController::class, 'update'])->middleware('admin');
+});
+
+// Rutas del componente
+
+Route::group([
+    'middleware' => 'api',
+    'prefix' => 'component'
+], function () {
+    Route::get('/', [ComponentController::class, 'index']);
+    Route::post('/', [ComponentController::class, 'store'])->middleware('admin');
+    Route::post('/{id}', [ComponentController::class, 'update'])->middleware('admin');
 });
