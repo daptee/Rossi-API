@@ -11,7 +11,7 @@ class WebContentAbout extends Model
     
     use HasFactory;
 
-    protected $fillable = ['date', 'id_user', 'data'];
+    protected $fillable = ['id_user', 'data'];
 
     protected $casts = [
         'data' => 'array',

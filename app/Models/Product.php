@@ -24,7 +24,8 @@ class Product extends Model
     public function attributes()
     {
         return $this->belongsToMany(AttributeValue::class, 'product_attributes', 'id_product', 'id_attribute_value')
-                    ->withPivot('img'); // Si quieres traer también la columna 'img' de la tabla pivot
+            ->withPivot('img')
+            ->with('attribute');
     }
 
     public function categories()
@@ -34,12 +35,18 @@ class Product extends Model
 
     public function materials()
     {
-        return $this->belongsToMany(MaterialValue::class, 'product_materials', 'id_product', 'id_material');
+        return $this->belongsToMany(MaterialValue::class, 'product_materials', 'id_product', 'id_material')
+            ->with('material'); // Esto carga la relación con el modelo Material
     }
 
     public function gallery()
     {
         return $this->hasMany(ProductGallery::class, 'id_product');
+    }
+
+    public function components()
+    {
+        return $this->belongsToMany(Component::class, 'product_components', 'id_product', 'id_component');
     }
 }
 

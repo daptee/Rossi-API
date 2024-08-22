@@ -73,3 +73,14 @@ CREATE TABLE product_attributes (
     FOREIGN KEY (id_product) REFERENCES products(id) ON DELETE CASCADE,
     FOREIGN KEY (id_attribute_value) REFERENCES attributes(id) ON DELETE CASCADE
 );
+
+-- Tabla de componentes de productos
+CREATE TABLE product_components (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_product INT,
+    id_component INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_product) REFERENCES products(id) ON DELETE CASCADE,
+    FOREIGN KEY (id_component) REFERENCES components(id) ON DELETE CASCADE
+);
