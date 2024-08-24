@@ -36,12 +36,12 @@ class ComponentController extends Controller
 
             $imgPath = $request->hasFile('img') ? $request->file('img')->store('componet/images') : null;
     
-            $webContent = Component::create([
+            $component = Component::create([
                 'name' => $request->name,
                 'img' => $imgPath,
             ]);
             
-            return ApiResponse::create('Componente creado correctamente', 200, $webContent);
+            return ApiResponse::create('Componente creado correctamente', 200, $component);
         } catch (Exception $e) {
             return ApiResponse::create('Error al crear el componente', 500, ['error' => $e->getMessage()]);
         }

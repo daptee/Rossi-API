@@ -25,4 +25,14 @@ class ProductsCategories extends Model
     {
         return $this->belongsTo(ProductsCategories::class, 'id_category');
     }
+
+    public function categories()
+    {
+        return $this->hasMany(ProductsCategories::class, 'id_category')->with('categories', 'status');
+    }
+
+    public function status()
+    {
+        return $this->belongsTo(CategoriesStatus::class, 'status', 'id');
+    }
 }

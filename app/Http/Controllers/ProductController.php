@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Responses\ApiResponse;
 use App\Models\ProductComponent;
+use App\Models\ProductStatus;
 use Illuminate\Http\Request;
 use App\Models\Product;
 use App\Models\ProductCategory;
@@ -21,7 +22,9 @@ class ProductController extends Controller
     public function indexAdmin()
     {
         try {
-            $products = Product::select('id', 'name', 'main_img', 'status', 'featured')
+            // Consulta con join para obtener datos del estado del producto
+            $products = Product::select('products.id', 'products.name', 'products.main_img', 'products.status', 'products.featured', 'product_status.status_name')
+                ->join('product_status', 'products.status', '=', 'product_status.id')
                 ->withCount(['categories', 'materials', 'attributes', 'gallery', 'components'])
                 ->get();
 
@@ -31,7 +34,10 @@ class ProductController extends Controller
                     'id' => $product->id,
                     'name' => $product->name,
                     'main_img' => $product->main_img,
-                    'status' => $product->status,
+                    'status' => [
+                        'id' => $product->status,
+                        'status_name' => $product->status_name,
+                    ],
                     'featured' => $product->featured,
                     'categories_count' => $product->categories_count,
                     'materials_count' => $product->materials_count,
@@ -73,7 +79,8 @@ class ProductController extends Controller
     public function indexProduct($id)
     {
         try {
-            $products = Product::with([
+            // Consulta el producto con todas las relaciones necesarias
+            $product = Product::with([
                 'categories',
                 'materials.material',
                 'attributes.attribute',
@@ -83,29 +90,46 @@ class ProductController extends Controller
                 ->select('id', 'name', 'description', 'main_img', 'main_video', 'file_data_sheet', 'status', 'featured')
                 ->findOrFail($id);
 
-            $products->categories->each(function ($category) {
+            // Limpia los datos del pivot para cada relación
+            $product->categories->each(function ($category) {
                 unset($category->pivot);
             });
 
-            $products->materials->each(function ($material) {
+            $product->materials->each(function ($material) {
                 unset($material->pivot);
             });
 
-            $products->attributes->each(function ($attribute) {
+            $product->attributes->each(function ($attribute) {
                 $attribute->img = $attribute->pivot->img;
                 unset($attribute->pivot);
             });
 
-            $products->components->each(function ($component) {
+            $product->components->each(function ($component) {
                 unset($component->pivot);
             });
 
-            return ApiResponse::create('Succeeded', 200, $products);
+            // Obtener el nombre del estado del producto desde la tabla product_status
+            $status = ProductStatus::find($product->status);
+
+            // Si se encuentra el estado, agrega su nombre al producto
+            if ($status) {
+                $product->status = [
+                    'id' => $status->id,
+                    'status_name' => $status->status_name
+                ];
+            } else {
+                // Si no se encuentra el estado, puedes definir un valor por defecto o manejar el error
+                $product->status = [
+                    'id' => $product->status,
+                    'status_name' => 'Unknown' // O cualquier valor por defecto
+                ];
+            }
+
+            return ApiResponse::create('Succeeded', 200, $product);
         } catch (Exception $e) {
             return ApiResponse::create('Error al obtener el producto', 500, ['error' => $e->getMessage()]);
         }
     }
-
 
     // POST - Crear un nuevo producto
     public function store(Request $request)
@@ -200,12 +224,55 @@ class ProductController extends Controller
                 }
             }
 
+            $product = Product::with([
+                'categories',
+                'materials.material',
+                'attributes.attribute',
+                'gallery',
+                'components'
+            ])
+            ->findOrFail($product->id);
+    
+            // Limpiar datos del pivot para cada relación
+            $product->categories->each(function ($category) {
+                unset($category->pivot);
+            });
+    
+            $product->materials->each(function ($material) {
+                unset($material->pivot);
+            });
+    
+            $product->attributes->each(function ($attribute) {
+                $attribute->img = $attribute->pivot->img;
+                unset($attribute->pivot);
+            });
+    
+            $product->components->each(function ($component) {
+                unset($component->pivot);
+            });
+    
+            // Obtener el nombre del estado del producto desde la tabla product_status
+            $status = ProductStatus::find($product->status);
+    
+            // Si se encuentra el estado, agrega su nombre al producto
+            if ($status) {
+                $product->status = [
+                    'id' => $status->id,
+                    'status_name' => $status->status_name
+                ];
+            } else {
+                // Si no se encuentra el estado, puedes definir un valor por defecto o manejar el error
+                $product->status = [
+                    'id' => $product->status,
+                    'status_name' => 'Unknown' // O cualquier valor por defecto
+                ];
+            }    
+
             return ApiResponse::create('Producto creado correctamente', 200, $product);
         } catch (Exception $e) {
             return ApiResponse::create('Error al crear producto', 500, ['error' => $e->getMessage()]);
         }
     }
-
 
     // PUT - Editar un producto
     public function update(Request $request, $id)
@@ -305,12 +372,55 @@ class ProductController extends Controller
                 }
             }
 
+            $product = Product::with([
+                'categories',
+                'materials.material',
+                'attributes.attribute',
+                'gallery',
+                'components'
+            ])
+            ->findOrFail($product->id);
+    
+            // Limpiar datos del pivot para cada relación
+            $product->categories->each(function ($category) {
+                unset($category->pivot);
+            });
+    
+            $product->materials->each(function ($material) {
+                unset($material->pivot);
+            });
+    
+            $product->attributes->each(function ($attribute) {
+                $attribute->img = $attribute->pivot->img;
+                unset($attribute->pivot);
+            });
+    
+            $product->components->each(function ($component) {
+                unset($component->pivot);
+            });
+    
+            // Obtener el nombre del estado del producto desde la tabla product_status
+            $status = ProductStatus::find($product->status);
+    
+            // Si se encuentra el estado, agrega su nombre al producto
+            if ($status) {
+                $product->status = [
+                    'id' => $status->id,
+                    'status_name' => $status->status_name
+                ];
+            } else {
+                // Si no se encuentra el estado, puedes definir un valor por defecto o manejar el error
+                $product->status = [
+                    'id' => $product->status,
+                    'status_name' => 'Unknown' // O cualquier valor por defecto
+                ];
+            }    
+
             return ApiResponse::create('Product actualizado successfully', 200, $product);
         } catch (Exception $e) {
             return ApiResponse::create('Error al actualizar producto', 500, ['error' => $e->getMessage()]);
         }
     }
-
 
     private function buildTree($items)
     {
