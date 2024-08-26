@@ -2,7 +2,7 @@ USE rossi_equipamientos;
 
 SET FOREIGN_KEY_CHECKS = 0;
 
-DROP TABLE IF EXISTS products, product_status, product_galleries, product_categories, product_materials, product_attributes;
+DROP TABLE IF EXISTS products, product_status, product_galleries, product_categories, product_materials, product_attributes, product_components;
 
 SET FOREIGN_KEY_CHECKS = 1;
 

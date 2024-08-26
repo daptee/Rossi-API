@@ -26,7 +26,7 @@ Route::group([
 ], function () {
     Route::get('/', [ProductsCategoriesController::class, 'index']);
     Route::post('/', [ProductsCategoriesController::class, 'store'])->middleware('admin');
-    Route::put('/{id}', [ProductsCategoriesController::class, 'update'])->middleware('admin');
+    Route::post('/{id}', [ProductsCategoriesController::class, 'update'])->middleware('admin');
 });
 
 // Rutas de materiales
