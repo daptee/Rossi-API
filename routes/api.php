@@ -37,7 +37,7 @@ Route::group([
 ], function () {
     Route::get('/', [MaterialController::class, 'index']);
     Route::post('/', [MaterialController::class, 'store'])->middleware('admin');
-    Route::put('/{id}', [MaterialController::class, 'update'])->middleware('admin');
+    Route::post('/{id}', [MaterialController::class, 'update'])->middleware('admin');
 });
 
 // Rutas de atributos

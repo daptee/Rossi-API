@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\Material;
 use App\Models\MaterialValue;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Storage;
 use Exception;
 
 class MaterialController extends Controller
@@ -44,16 +45,14 @@ class MaterialController extends Controller
             if ($request->has('values')) {
                 foreach ($request->values as $valueData) {
                     if (isset($valueData['img']) && $valueData['img'] instanceof \Illuminate\Http\UploadedFile) {
-
-                        $imgPath = $valueData['img']->store('materials/images');
-                        $valueData['img'] = $imgPath;
+                        $imgPath = $valueData['img']->store('materials/images', 'public');
+                        $valueData['img'] = 'public/storage/' . $imgPath; // Aseguramos que se guarde con el prefijo correcto
                     }
 
                     $valueData['id_material'] = $material->id;
                     MaterialValue::create($valueData);
                 }
             }
-
 
             $material->load('values');
             return ApiResponse::create('Material creado correctamente', 200, $material);
@@ -71,7 +70,7 @@ class MaterialController extends Controller
                 'values' => 'nullable|array',
                 'values.*.id' => 'sometimes|exists:material_values,id',
                 'values.*.value' => 'required_with:values|string|max:255',
-                'values.*.img' => 'nullable|string|max:255',
+                'values.*.img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
                 'values.*.code' => 'nullable|string|max:255'
             ]);
 
@@ -86,8 +85,17 @@ class MaterialController extends Controller
                 foreach ($request->values as $valueData) {
                     if (isset($valueData['id'])) {
                         $value = MaterialValue::findOrFail($valueData['id']);
+                        if (isset($valueData['img']) && $valueData['img'] instanceof \Illuminate\Http\UploadedFile) {
+                            Storage::disk('public')->delete($value->img); // Eliminamos la imagen anterior
+                            $imgPath = $valueData['img']->store('materials/images', 'public');
+                            $valueData['img'] = 'public/storage/' . $imgPath; // Aseguramos que se guarde con el prefijo correcto
+                        }
                         $value->update($valueData);
                     } else {
+                        if (isset($valueData['img']) && $valueData['img'] instanceof \Illuminate\Http\UploadedFile) {
+                            $imgPath = $valueData['img']->store('materials/images', 'public');
+                            $valueData['img'] = 'public/storage/' . $imgPath; // Aseguramos que se guarde con el prefijo correcto
+                        }
                         $valueData['id_material'] = $material->id;
                         MaterialValue::create($valueData);
                     }

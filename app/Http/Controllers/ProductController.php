@@ -164,9 +164,9 @@ class ProductController extends Controller
             }
 
             // Guardar archivos de imágenes y videos
-            $mainImgPath = $request->hasFile('main_img') ? $request->file('main_img')->store('products/images') : null;
-            $mainVideoPath = $request->hasFile('main_video') ? $request->file('main_video')->store('products/videos') : null;
-            $fileDataSheetPath = $request->hasFile('file_data_sheet') ? $request->file('file_data_sheet')->store('products/data_sheets') : null;
+            $mainImgPath = $request->hasFile('main_img') ? $request->file('main_img')->store('products/images', 'public') : null;
+            $mainVideoPath = $request->hasFile('main_video') ? $request->file('main_video')->store('products/videos', 'public') : null;
+            $fileDataSheetPath = $request->hasFile('file_data_sheet') ? $request->file('file_data_sheet')->store('products/data_sheets', 'public') : null;
 
             $product = Product::create([
                 'name' => $request->name,
@@ -183,7 +183,7 @@ class ProductController extends Controller
             // Guardar imágenes en la galería
             if ($request->has('gallery')) {
                 foreach ($request->gallery as $file) {
-                    $filePath = $file->store('products/gallery');
+                    $filePath = $file->store('products/gallery', 'public');
                     ProductGallery::create(['id_product' => $product->id, 'file' => $filePath]);
                 }
             }
@@ -208,7 +208,7 @@ class ProductController extends Controller
             // Guardar atributos asociados al producto
             if ($request->has('attributes_values')) {
                 foreach ($request->attributes_values as $attribute) {
-                    $attributeImgPath = $request->hasFile('attributes_values.*.img') ? $attribute['img']->store('products/attributes') : null;
+                    $attributeImgPath = $request->hasFile('attributes_values.*.img') ? $attribute['img']->store('products/attributes', 'public') : null;
                     ProductAttribute::create([
                         'id_product' => $product->id,
                         'id_attribute_value' => $attribute['id_attribute_value'],
@@ -231,29 +231,29 @@ class ProductController extends Controller
                 'gallery',
                 'components'
             ])
-            ->findOrFail($product->id);
-    
+                ->findOrFail($product->id);
+
             // Limpiar datos del pivot para cada relación
             $product->categories->each(function ($category) {
                 unset($category->pivot);
             });
-    
+
             $product->materials->each(function ($material) {
                 unset($material->pivot);
             });
-    
+
             $product->attributes->each(function ($attribute) {
                 $attribute->img = $attribute->pivot->img;
                 unset($attribute->pivot);
             });
-    
+
             $product->components->each(function ($component) {
                 unset($component->pivot);
             });
-    
+
             // Obtener el nombre del estado del producto desde la tabla product_status
             $status = ProductStatus::find($product->status);
-    
+
             // Si se encuentra el estado, agrega su nombre al producto
             if ($status) {
                 $product->status = [
@@ -266,7 +266,7 @@ class ProductController extends Controller
                     'id' => $product->status,
                     'status_name' => 'Unknown' // O cualquier valor por defecto
                 ];
-            }    
+            }
 
             return ApiResponse::create('Producto creado correctamente', 200, $product);
         } catch (Exception $e) {
@@ -274,7 +274,6 @@ class ProductController extends Controller
         }
     }
 
-    // PUT - Editar un producto
     public function update(Request $request, $id)
     {
         try {
@@ -310,65 +309,75 @@ class ProductController extends Controller
             // Actualizar y eliminar imágenes si es necesario
             if ($request->hasFile('main_img')) {
                 Storage::delete($product->main_img);
-                $product->main_img = $request->file('main_img')->store('products/images');
+                $product->main_img = $request->file('main_img')->store('products/images', 'public');
             }
 
             if ($request->hasFile('main_video')) {
                 Storage::delete($product->main_video);
-                $product->main_video = $request->file('main_video')->store('products/videos');
+                $product->main_video = $request->file('main_video')->store('products/videos', 'public');
             }
 
             if ($request->hasFile('file_data_sheet')) {
                 Storage::delete($product->file_data_sheet);
-                $product->file_data_sheet = $request->file('file_data_sheet')->store('products/data_sheets');
+                $product->file_data_sheet = $request->file('file_data_sheet')->store('products/data_sheets', 'public');
             }
 
-            $product->update($request->only('name', 'sku', 'slug', 'description', 'status', 'featured'));
+            $product->update([
+                'name' => $request->name,
+                'sku' => $request->sku,
+                'slug' => $request->slug,
+                'description' => $request->description,
+                'status' => $request->status,
+                'featured' => $request->featured,
+            ]);
 
-            // Actualizar las categorías asociadas al producto
-            if ($request->has('categories')) {
-                $product->categories()->sync($request->categories);
-            }
-
-            // Actualizar la galería
+            // Eliminar imágenes de la galería
             if ($request->has('gallery')) {
-                foreach ($product->gallery as $galleryItem) {
-                    Storage::delete($galleryItem->file);
-                    $galleryItem->delete();
+                foreach ($product->gallery as $gallery) {
+                    Storage::delete($gallery->file);
+                    $gallery->delete();
                 }
 
                 foreach ($request->gallery as $file) {
-                    $filePath = $file->store('products/gallery');
+                    $filePath = $file->store('products/gallery', 'public');
                     ProductGallery::create(['id_product' => $product->id, 'file' => $filePath]);
                 }
             }
 
-            // Actualizar los materiales asociados al producto
-            if ($request->has('materials_values')) {
-                $product->materials()->sync($request->materials_values);
+            // Eliminar relaciones de categorías y volver a crearlas
+            ProductCategory::where('id_product', $product->id)->delete();
+            if ($request->has('categories')) {
+                foreach ($request->categories as $categoryId) {
+                    ProductCategory::create(['id_product' => $product->id, 'id_categorie' => $categoryId]);
+                }
             }
 
-            // Actualizar los atributos asociados al producto
+            // Eliminar materiales y volver a crearlos
+            ProductMaterial::where('id_product', $product->id)->delete();
+            if ($request->has('materials_values')) {
+                foreach ($request->materials_values as $materialId) {
+                    ProductMaterial::create(['id_product' => $product->id, 'id_material' => $materialId]);
+                }
+            }
+
+            // Eliminar atributos y volver a crearlos
+            ProductAttribute::where('id_product', $product->id)->delete();
             if ($request->has('attributes_values')) {
-                // Eliminar todos los atributos existentes del producto
-                foreach ($product->attributes as $attribute) {
-                    if ($attribute->pivot->img) {
-                        Storage::delete($attribute->pivot->img);
-                    }
+                foreach ($request->attributes_values as $attribute) {
+                    $attributeImgPath = $request->hasFile('attributes_values.*.img') ? $attribute['img']->store('products/attributes', 'public') : null;
+                    ProductAttribute::create([
+                        'id_product' => $product->id,
+                        'id_attribute_value' => $attribute['id_attribute_value'],
+                        'img' => $attributeImgPath,
+                    ]);
                 }
-                $product->attributes()->detach();
+            }
 
-                // Crear nuevos atributos
-                foreach ($request->attributes_values as $index => $attribute) {
-                    $attributeImgPath = $request->hasFile("attributes_values.$index.img")
-                        ? $request->file("attributes_values.$index.img")->store('products/attributes')
-                        : null;
-
-                    $product->attributes()->attach($attribute['id_attribute_value'], ['img' => $attributeImgPath]);
-                }
-
-                if ($request->has('components')) {
-                    $product->components()->sync($request->components);
+            // Eliminar componentes y volver a crearlos
+            ProductComponent::where('id_product', $product->id)->delete();
+            if ($request->has('components')) {
+                foreach ($request->components as $componentId) {
+                    ProductComponent::create(['id_product' => $product->id, 'id_component' => $componentId]);
                 }
             }
 
@@ -379,29 +388,29 @@ class ProductController extends Controller
                 'gallery',
                 'components'
             ])
-            ->findOrFail($product->id);
-    
+                ->findOrFail($product->id);
+
             // Limpiar datos del pivot para cada relación
             $product->categories->each(function ($category) {
                 unset($category->pivot);
             });
-    
+
             $product->materials->each(function ($material) {
                 unset($material->pivot);
             });
-    
+
             $product->attributes->each(function ($attribute) {
                 $attribute->img = $attribute->pivot->img;
                 unset($attribute->pivot);
             });
-    
+
             $product->components->each(function ($component) {
                 unset($component->pivot);
             });
-    
+
             // Obtener el nombre del estado del producto desde la tabla product_status
             $status = ProductStatus::find($product->status);
-    
+
             // Si se encuentra el estado, agrega su nombre al producto
             if ($status) {
                 $product->status = [
@@ -414,9 +423,9 @@ class ProductController extends Controller
                     'id' => $product->status,
                     'status_name' => 'Unknown' // O cualquier valor por defecto
                 ];
-            }    
+            }
 
-            return ApiResponse::create('Product actualizado successfully', 200, $product);
+            return ApiResponse::create('Producto actualizado correctamente', 200, $product);
         } catch (Exception $e) {
             return ApiResponse::create('Error al actualizar producto', 500, ['error' => $e->getMessage()]);
         }
