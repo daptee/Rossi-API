@@ -3,8 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Http\Responses\ApiResponse;
-use App\Models\CategoriesStatus;
-use App\Models\ProductStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
@@ -48,9 +46,13 @@ class ProductsCategoriesController extends Controller
                 return ApiResponse::create('Validation failed', 422, $validator->errors());
             }
 
-            $imgPath = $request->hasFile('img') ? $request->file('img')->store('categories/images') : null;
+            $imgPath = $request->hasFile('img') 
+                ? $request->file('img')->store('categories/images', 'public') 
+                : null;
 
-            $videoPath = $request->hasFile('video') ? $request->file('video')->store('categories/videos') : null;
+            $videoPath = $request->hasFile('video') 
+                ? $request->file('video')->store('categories/videos', 'public') 
+                : null;
 
             $category = new ProductsCategories([
                 'id_category' => $request->input('id_category'),
@@ -63,7 +65,6 @@ class ProductsCategoriesController extends Controller
             ]);
 
             $category->save();
-
             $category->load('status');
 
             return ApiResponse::create('Categoría creada correctamente', 200, $category);
@@ -71,7 +72,6 @@ class ProductsCategoriesController extends Controller
             return ApiResponse::create('Error al crear una categoría', 500, ['error' => $e->getMessage()]);
         }
     }
-
 
     // PUT
     public function update(Request $request, $id)
@@ -96,20 +96,19 @@ class ProductsCategoriesController extends Controller
             if ($request->hasFile('img')) {
                 // Eliminar la imagen antigua si existe
                 if ($category->img) {
-                    Storage::delete($category->img);
+                    Storage::disk('public')->delete($category->img);
                 }
-                $imgPath = $request->file('img')->store('categories/images');
+                $imgPath = $request->file('img')->store('categories/images', 'public');
             } else {
                 $imgPath = $category->img;
             }
 
-            // Manejar archivo de video
             if ($request->hasFile('video')) {
                 // Eliminar el video antiguo si existe
                 if ($category->video) {
-                    Storage::delete($category->video);
+                    Storage::disk('public')->delete($category->video);
                 }
-                $videoPath = $request->file('video')->store('categories/videos');
+                $videoPath = $request->file('video')->store('categories/videos', 'public');
             } else {
                 $videoPath = $category->video;
             }
@@ -145,4 +144,3 @@ class ProductsCategoriesController extends Controller
         return $category;
     }
 }
-

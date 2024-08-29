@@ -6,7 +6,7 @@ use App\Http\Responses\ApiResponse;
 use Illuminate\Http\Request;
 use App\Models\Distributor;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Log; 
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Exception;
 
@@ -38,13 +38,14 @@ class DistributorController extends Controller
                 'whatsapp' => 'nullable|string|max:20',
                 'email' => 'nullable|email|max:100',
                 'instagram' => 'nullable|string|max:100',
-            ]);            
+            ]);
 
             if ($validator->fails()) {
                 return ApiResponse::create('Validation failed', 422, $validator->errors());
             }
 
             $distributor = Distributor::create($request->all());
+            $distributor->load('locality.province');
 
             return ApiResponse::create('Distribuitor creado con exito', 200, $distributor);
         } catch (Exception $e) {
@@ -57,8 +58,7 @@ class DistributorController extends Controller
     public function update(Request $request, $id)
     {
         try {
-            Log::info('Request Data:', $request->all());
-            
+
             $validator = Validator::make($request->all(), [
                 'name' => 'required|string|max:150',
                 'address' => 'required|string|max:255',
@@ -74,10 +74,12 @@ class DistributorController extends Controller
             if ($validator->fails()) {
                 return ApiResponse::create('Validation failed', 422, $validator->errors());
             }
-    
-            $distributor = Distributor::find($id);
+
+            $distributor = Distributor::findOrFail($id);
             $distributor->update($request->all());
-    
+
+            $distributor->load('locality.province');
+
             return ApiResponse::create('Distribuidor actualizado con exito', 200, $distributor);
         } catch (Exception $e) {
             return ApiResponse::create('Error al actualizar un distribuidor', 500, ['error' => $e->getMessage()]);
