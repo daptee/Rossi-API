@@ -34,9 +34,9 @@ class ProductsCategoriesController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'category' => 'required|string|max:255',
-                'img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
+                'img' => 'nullable|file|mimes:jpg,jpeg,png|max:2048',
                 'video' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
-                'icon' => 'nullable|string',
+                'icon' => 'nullable|file|mimes:svg,png|max:2048',
                 'color' => 'nullable|string',
                 'status' => 'required|integer|exists:categories_status,id',
                 'id_category' => 'nullable|exists:products_categories,id',
@@ -54,12 +54,16 @@ class ProductsCategoriesController extends Controller
                 ? $request->file('video')->store('categories/videos', 'public') 
                 : null;
 
+            $iconPath = $request->hasFile('icon') 
+                ? $request->file('icon')->store('categories/icons', 'public') 
+                : null;
+
             $category = new ProductsCategories([
                 'id_category' => $request->input('id_category'),
                 'category' => $request->input('category'),
                 'img' => $imgPath,
                 'video' => $videoPath,
-                'icon' => $request->input('icon'),
+                'icon' => $iconPath,
                 'color' => $request->input('color'),
                 'status' => $request->input('status'),
             ]);
@@ -81,7 +85,7 @@ class ProductsCategoriesController extends Controller
                 'category' => 'required|string|max:255',
                 'img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
                 'video' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
-                'icon' => 'nullable|string',
+                'icon' => 'nullable|file|mimes:svg,png|max:2048',
                 'color' => 'nullable|string',
                 'status' => 'required|integer|exists:categories_status,id',
                 'id_category' => 'nullable|exists:products_categories,id',
@@ -113,12 +117,22 @@ class ProductsCategoriesController extends Controller
                 $videoPath = $category->video;
             }
 
+            if ($request->hasFile('icon')) {
+                // Eliminar la icono antigua si existe
+                if ($category->icon) {
+                    Storage::disk('public')->delete($category->icon);
+                }
+                $iconPath = $request->file('icon')->store('categories/icons', 'public');
+            } else {
+                $iconPath = $category->icon;
+            }
+
             $category->update([
                 'id_category' => $request->input('id_category'),
                 'category' => $request->input('category'),
                 'img' => $imgPath,
                 'video' => $videoPath,
-                'icon' => $request->input('icon'),
+                'icon' => $iconPath,
                 'color' => $request->input('color'),
                 'status' => $request->input('status'),
             ]);
