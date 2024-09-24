@@ -38,7 +38,7 @@ class ProductsCategoriesController extends Controller
                 'video' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
                 'icon' => 'nullable|file|mimes:svg,png|max:2048',
                 'color' => 'nullable|string',
-                'status' => 'required|integer|exists:categories_status,id',
+                'status' => 'required|integer|exists:status,id',
                 'id_category' => 'nullable|exists:products_categories,id',
             ]);
 
@@ -118,7 +118,7 @@ class ProductsCategoriesController extends Controller
                 'video' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
                 'icon' => 'nullable|file|mimes:svg,png|max:2048',
                 'color' => 'nullable|string',
-                'status' => 'required|integer|exists:categories_status,id',
+                'status' => 'required|integer|exists:status,id',
                 'id_category' => 'nullable|exists:products_categories,id',
             ]);
 
