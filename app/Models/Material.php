@@ -9,7 +9,7 @@ class Material extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['id_material', 'name'];
+    protected $fillable = ['id_material', 'name', 'status'];
 
     public function parent()
     {
@@ -24,5 +24,10 @@ class Material extends Model
     public function values()
     {
         return $this->hasMany(MaterialValue::class, 'id_material');
+    }
+
+    public function status()
+    {
+        return $this->belongsTo(Status::class, 'status', 'id');
     }
 }

@@ -16,5 +16,11 @@ class Component extends Model
     protected $fillable = [
         'name',
         'img',
+        'status'
     ];
+
+    public function status()
+    {
+        return $this->belongsTo(Status::class, 'status', 'id');
+    }
 }

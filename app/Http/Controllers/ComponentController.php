@@ -14,7 +14,7 @@ class ComponentController extends Controller
     public function index()
     {
         try {
-            $components = Component::all();
+            $components = Component::with('status')->get();
             return ApiResponse::create('Succeeded', 200, $components);
         } catch (Exception $e) {
             return ApiResponse::create('Error al traer los componentes', 500, ['error' => $e->getMessage()]);
@@ -27,6 +27,7 @@ class ComponentController extends Controller
             $validator = Validator::make($request->all(), [
                 'name' => 'required|string|max:255',
                 'img' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+                'status' => 'required|integer|exists:status,id',
             ]);
 
             if ($validator->fails()) {
@@ -52,7 +53,10 @@ class ComponentController extends Controller
             $component = Component::create([
                 'name' => $request->name,
                 'img' => $imgPath,
+                'status' => $request->status,
             ]);
+
+            $component->load('status');
 
             return ApiResponse::create('Componente creado correctamente', 200, $component);
         } catch (Exception $e) {
@@ -66,6 +70,7 @@ class ComponentController extends Controller
             $validator = Validator::make($request->all(), [
                 'name' => 'sometimes|required|string|max:255',
                 'img' => 'sometimes|required|image|mimes:jpeg,png,jpg,gif|max:2048',
+                'status' => 'required|integer|exists:status,id',
             ]);
 
             if ($validator->fails()) {
@@ -99,7 +104,12 @@ class ComponentController extends Controller
                 $component->name = $request->name;
             }
 
+            if ($request->has('status')) {
+                $component->status = $request->status;
+            }
+
             $component->save();
+            $component->load('status');
 
             return ApiResponse::create('Componente actualizado correctamente', 200, $component);
         } catch (Exception $e) {

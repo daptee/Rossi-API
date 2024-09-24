@@ -16,5 +16,5 @@ CREATE TABLE products_categories (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (id_category) REFERENCES products_categories(id) ON DELETE SET NULL,
-    FOREIGN KEY (status) REFERENCES categories_status(id)
+    FOREIGN KEY (status) REFERENCES status(id)
 );

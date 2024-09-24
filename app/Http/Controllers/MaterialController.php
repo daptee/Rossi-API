@@ -15,7 +15,7 @@ class MaterialController extends Controller
     public function index()
     {
         try {
-            $materials = Material::whereNull('id_material')->with('values')->get();
+            $materials = Material::whereNull('id_material')->with('values', 'status')->get();
             $materials = $this->buildTree($materials);
 
             return ApiResponse::create('Succeeded', 200, $materials);
@@ -30,6 +30,7 @@ class MaterialController extends Controller
             $validator = Validator::make($request->all(), [
                 'id_material' => 'nullable|exists:materials,id',
                 'name' => 'required|string|max:255',
+                'status' => 'required|integer|exists:status,id',
                 'values' => 'nullable|array',
                 'values.*.value' => 'required_with:values|string|max:255',
                 'values.*.img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
@@ -40,7 +41,7 @@ class MaterialController extends Controller
                 return ApiResponse::create('Validation failed', 422, $validator->errors());
             }
 
-            $material = Material::create($request->only('id_material', 'name'));
+            $material = Material::create($request->only('id_material', 'name', 'status'));
 
             if ($request->has('values')) {
                 // Definir la ruta base dentro de public/storage/materials
@@ -64,7 +65,7 @@ class MaterialController extends Controller
                 }
             }
 
-            $material->load('values');
+            $material->load('values', 'status');
             return ApiResponse::create('Material creado correctamente', 200, $material);
         } catch (Exception $e) {
             return ApiResponse::create('Error al crear un material', 500, ['error' => $e->getMessage()]);
@@ -78,6 +79,7 @@ class MaterialController extends Controller
             $validator = Validator::make($request->all(), [
                 'id_material' => 'nullable|exists:materials,id',
                 'name' => 'required|string|max:255',
+                'status' => 'required|integer|exists:status,id',
                 'values' => 'nullable|array',
                 'values.*.id' => 'sometimes|exists:material_values,id',
                 'values.*.value' => 'required_with:values|string|max:255',
@@ -93,7 +95,7 @@ class MaterialController extends Controller
 
             
             
-            $material->update($request->only('id_material', 'name'));
+            $material->update($request->only('id_material', 'name', 'status'));
 
             if ($request->has('values')) {
                 // Definir la ruta base dentro de public/storage/materials
@@ -137,7 +139,7 @@ class MaterialController extends Controller
                 }
             }
 
-            $material->load('values');
+            $material->load('values', 'status');
             return ApiResponse::create('Material actualizado correctamente', 200, $material);
         } catch (Exception $e) {
             return ApiResponse::create('Error al actualizar un material', 500, ['error' => $e->getMessage()]);

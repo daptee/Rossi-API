@@ -14,7 +14,7 @@ class AttributeController extends Controller
     public function index()
     {
         try {
-            $attributes = Attribute::whereNull('id_attribute')->with('values')->get();
+            $attributes = Attribute::whereNull('id_attribute')->with('values', 'status')->get();
             $attributes = $this->buildTree($attributes);
 
             return ApiResponse::create('Succeeded', 200, $attributes);
@@ -29,6 +29,7 @@ class AttributeController extends Controller
             $validator = Validator::make($request->all(), [
                 'id_attribute' => 'nullable|exists:attributes,id',
                 'name' => 'required|string|max:255',
+                'status' => 'required|integer|exists:status,id',
                 'values' => 'nullable|array',
                 'values.*.value' => 'required_with:values|string|max:255'
             ]);
@@ -37,7 +38,7 @@ class AttributeController extends Controller
                 return ApiResponse::create('Validation failed', 422, $validator->errors());
             }
     
-            $attribute = Attribute::create($request->only('id_attribute', 'name'));
+            $attribute = Attribute::create($request->only('id_attribute', 'name', 'status'));
     
             if ($request->has('values')) {
                 foreach ($request->values as $valueData) {
@@ -46,7 +47,7 @@ class AttributeController extends Controller
                 }
             }
     
-            $attribute->load('values');
+            $attribute->load('values', 'status');
             return ApiResponse::create('Succeeded', 200, $attribute);
         } catch (Exception $e) {
             return ApiResponse::create('Error al crear un atributo', 500, ['error' => $e->getMessage()]);
@@ -59,6 +60,7 @@ class AttributeController extends Controller
             $validator = Validator::make($request->all(), [
                 'id_attribute' => 'nullable|exists:attributes,id',
                 'name' => 'required|string|max:255',
+                'status' => 'required|integer|exists:status,id',
                 'values' => 'nullable|array',
                 'values.*.id' => 'sometimes|exists:attribute_values,id',
                 'values.*.value' => 'required_with:values|string|max:255'
@@ -69,7 +71,7 @@ class AttributeController extends Controller
             }
     
             $attribute = Attribute::findOrFail($id);
-            $attribute->update($request->only('id_attribute', 'name'));
+            $attribute->update($request->only('id_attribute', 'name', 'status'));
     
             if ($request->has('values')) {
                 foreach ($request->values as $valueData) {
@@ -83,7 +85,7 @@ class AttributeController extends Controller
                 }
             }
     
-            $attribute->load('values');
+            $attribute->load('values', 'status');
             return ApiResponse::create('Succeeded', 200, $attribute);
         } catch (Exception $e) {
             return ApiResponse::create('Error al actualizar un atributo', 500, ['error' => $e->getMessage()]);

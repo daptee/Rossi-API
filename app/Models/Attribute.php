@@ -9,7 +9,7 @@ class Attribute extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['id_attribute', 'name'];
+    protected $fillable = ['id_attribute', 'name', 'status'];
 
     public function parent()
     {
@@ -24,5 +24,10 @@ class Attribute extends Model
     public function values()
     {
         return $this->hasMany(AttributeValue::class, 'id_attribute');
+    }
+
+    public function status()
+    {
+        return $this->belongsTo(Status::class, 'status', 'id');
     }
 }

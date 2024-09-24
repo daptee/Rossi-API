@@ -284,7 +284,7 @@ class ProductController extends Controller
                 'sku' => 'required|string|max:100|unique:products,sku,' . $id,
                 'slug' => 'required|string|max:255|unique:products,slug,' . $id,
                 'description' => 'nullable|string',
-                'status' => 'required|integer|exists:product_status,id',
+                'status' => 'required|integer|exists:status,id',
                 'main_img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
                 'main_video' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
                 'file_data_sheet' => 'nullable|file|mimes:pdf|max:5120',

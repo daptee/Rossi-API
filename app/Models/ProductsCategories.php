@@ -33,6 +33,6 @@ class ProductsCategories extends Model
 
     public function status()
     {
-        return $this->belongsTo(CategoriesStatus::class, 'status', 'id');
+        return $this->belongsTo(Status::class, 'status', 'id');
     }
 }
