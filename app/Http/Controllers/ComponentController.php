@@ -33,13 +33,25 @@ class ComponentController extends Controller
                 return ApiResponse::create('Validation failed', 422, $validator->errors());
             }
 
-            $imgPath = $request->hasFile('img') 
-                ? $request->file('img')->store('components/images', 'public') 
-                : null;
+            // Definir la ruta base dentro de public/storage/components
+            $baseStoragePath = public_path('storage/components/images/');
+
+            // Verificar si la carpeta existe, si no, crearla
+            if (!file_exists($baseStoragePath)) {
+                mkdir($baseStoragePath, 0777, true);
+            }
+
+            // Procesar la imagen y moverla a la carpeta adecuada
+            $imgPath = null;
+            if ($request->hasFile('img')) {
+                $fileName = time() . '_' . $request->file('img')->getClientOriginalName();
+                $request->file('img')->move($baseStoragePath, $fileName);
+                $imgPath = 'storage/components/images/' . $fileName;
+            }
 
             $component = Component::create([
                 'name' => $request->name,
-                'img' => $imgPath ? 'public/storage/' . $imgPath : null,
+                'img' => $imgPath,
             ]);
 
             return ApiResponse::create('Componente creado correctamente', 200, $component);
@@ -62,17 +74,27 @@ class ComponentController extends Controller
 
             $component = Component::findOrFail($id);
 
-            if ($request->hasFile('img')) {
-                // Elimina la imagen anterior si existe
-                if ($component->img) {
-                    Storage::disk('public')->delete($component->img);
-                }
+            // Definir la ruta base dentro de public/storage/components
+            $baseStoragePath = public_path('storage/components/images/');
 
-                // Almacena la nueva imagen
-                $imgPath = $request->file('img')->store('components/images', 'public');
-                $component->img = 'public/storage/' . $imgPath;
+            // Verificar si la carpeta existe, si no, crearla
+            if (!file_exists($baseStoragePath)) {
+                mkdir($baseStoragePath, 0777, true);
             }
 
+            if ($request->hasFile('img')) {
+                // Elimina la imagen anterior si existe
+                if ($component->img && file_exists(public_path($component->img))) {
+                    unlink(public_path($component->img)); // Usamos unlink() para borrar la imagen
+                }
+
+                // Almacenar la nueva imagen
+                $fileName = time() . '_' . $request->file('img')->getClientOriginalName();
+                $request->file('img')->move($baseStoragePath, $fileName);
+                $component->img = 'storage/components/images/' . $fileName;
+            }
+
+            // Actualiza el nombre si se ha enviado en la solicitud
             if ($request->has('name')) {
                 $component->name = $request->name;
             }
@@ -84,4 +106,5 @@ class ComponentController extends Controller
             return ApiResponse::create('Error al actualizar el componente', 500, ['error' => $e->getMessage()]);
         }
     }
+
 }

@@ -43,10 +43,20 @@ class MaterialController extends Controller
             $material = Material::create($request->only('id_material', 'name'));
 
             if ($request->has('values')) {
+                // Definir la ruta base dentro de public/storage/materials
+                $baseStoragePath = public_path('storage/materials/images/');
+
+                // Verificar si la carpeta existe, si no, crearla
+                if (!file_exists($baseStoragePath)) {
+                    mkdir($baseStoragePath, 0777, true);
+                }
+
                 foreach ($request->values as $valueData) {
+                    // Procesar la imagen
                     if (isset($valueData['img']) && $valueData['img'] instanceof \Illuminate\Http\UploadedFile) {
-                        $imgPath = $valueData['img']->store('materials/images', 'public');
-                        $valueData['img'] = 'public/storage/' . $imgPath; // Aseguramos que se guarde con el prefijo correcto
+                        $fileName = time() . '_' . $valueData['img']->getClientOriginalName();
+                        $valueData['img']->move($baseStoragePath, $fileName);
+                        $valueData['img'] = 'storage/materials/images/' . $fileName;
                     }
 
                     $valueData['id_material'] = $material->id;
@@ -60,6 +70,7 @@ class MaterialController extends Controller
             return ApiResponse::create('Error al crear un material', 500, ['error' => $e->getMessage()]);
         }
     }
+
 
     public function update(Request $request, $id)
     {
@@ -79,23 +90,47 @@ class MaterialController extends Controller
             }
 
             $material = Material::findOrFail($id);
+
+            
+            
             $material->update($request->only('id_material', 'name'));
 
             if ($request->has('values')) {
+                // Definir la ruta base dentro de public/storage/materials
+                $baseStoragePath = public_path('storage/materials/images/');
+
+                // Verificar si la carpeta existe, si no, crearla
+                if (!file_exists($baseStoragePath)) {
+                    mkdir($baseStoragePath, 0777, true);
+                }
+
                 foreach ($request->values as $valueData) {
                     if (isset($valueData['id'])) {
                         $value = MaterialValue::findOrFail($valueData['id']);
+
+                        // Procesar la imagen
                         if (isset($valueData['img']) && $valueData['img'] instanceof \Illuminate\Http\UploadedFile) {
-                            Storage::disk('public')->delete($value->img); // Eliminamos la imagen anterior
-                            $imgPath = $valueData['img']->store('materials/images', 'public');
-                            $valueData['img'] = 'public/storage/' . $imgPath; // Aseguramos que se guarde con el prefijo correcto
+                            // Eliminar la imagen anterior si existe
+                            if ($value->img) {
+                                unlink(public_path($value->img));
+                            }
+
+                            // Guardar la nueva imagen
+                            $fileName = time() . '_' . $valueData['img']->getClientOriginalName();
+                            $valueData['img']->move($baseStoragePath, $fileName);
+                            $valueData['img'] = 'storage/materials/images/' . $fileName;
                         }
+
+                        // Actualizar el valor
                         $value->update($valueData);
                     } else {
+                        // Si es un nuevo valor, procesar la imagen si se proporciona
                         if (isset($valueData['img']) && $valueData['img'] instanceof \Illuminate\Http\UploadedFile) {
-                            $imgPath = $valueData['img']->store('materials/images', 'public');
-                            $valueData['img'] = 'public/storage/' . $imgPath; // Aseguramos que se guarde con el prefijo correcto
+                            $fileName = time() . '_' . $valueData['img']->getClientOriginalName();
+                            $valueData['img']->move($baseStoragePath, $fileName);
+                            $valueData['img'] = 'storage/materials/images/' . $fileName;
                         }
+
                         $valueData['id_material'] = $material->id;
                         MaterialValue::create($valueData);
                     }
@@ -108,6 +143,7 @@ class MaterialController extends Controller
             return ApiResponse::create('Error al actualizar un material', 500, ['error' => $e->getMessage()]);
         }
     }
+
 
     private function buildTree($materials)
     {
