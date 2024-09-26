@@ -16,7 +16,7 @@ class Material extends Model
         return $this->belongsTo(Material::class, 'id_material');
     }
 
-    public function children()
+    public function submaterials()
     {
         return $this->hasMany(Material::class, 'id_material');
     }
