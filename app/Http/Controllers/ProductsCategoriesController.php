@@ -52,19 +52,7 @@ class ProductsCategoriesController extends Controller
 
             // Definir la ruta base dentro de public/storage/categories
             $baseStoragePath = public_path('storage/categories/');
-
-            // Verificar si las carpetas existen, si no, crearlas
-            if (!file_exists($baseStoragePath . 'images')) {
-                mkdir($baseStoragePath . 'images', 0777, true);
-            }
-
-            if (!file_exists($baseStoragePath . 'videos')) {
-                mkdir($baseStoragePath . 'videos', 0777, true);
-            }
-
-            if (!file_exists($baseStoragePath . 'icons')) {
-                mkdir($baseStoragePath . 'icons', 0777, true);
-            }
+            $this->createDirectories($baseStoragePath);
 
             // Guardar la imagen
             if ($request->hasFile('img')) {
@@ -112,11 +100,12 @@ class ProductsCategoriesController extends Controller
     public function update(Request $request, $id)
     {
         try {
+            // Validar solo la existencia y tipo básico de datos
             $validator = Validator::make($request->all(), [
                 'category' => 'required|string|max:255',
-                'img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
-                'video' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
-                'icon' => 'nullable|file|mimes:svg,png|max:2048',
+                'img' => 'nullable',
+                'video' => 'nullable',
+                'icon' => 'nullable',
                 'color' => 'nullable|string',
                 'status' => 'required|integer|exists:status,id',
                 'id_category' => 'nullable|exists:products_categories,id',
@@ -128,61 +117,23 @@ class ProductsCategoriesController extends Controller
 
             $category = ProductsCategories::findOrFail($id);
 
+            // Definir rutas de archivos actuales
             $imgPath = $category->img;
             $videoPath = $category->video;
             $iconPath = $category->icon;
 
-            // Definir la ruta base dentro de public/storage/categories
+            // Definir la ruta base para almacenamiento
             $baseStoragePath = public_path('storage/categories/');
-
-            // Verificar si las carpetas existen, si no, crearlas
-            if (!file_exists($baseStoragePath . 'images')) {
-                mkdir($baseStoragePath . 'images', 0777, true);
-            }
-
-            if (!file_exists($baseStoragePath . 'videos')) {
-                mkdir($baseStoragePath . 'videos', 0777, true);
-            }
-
-            if (!file_exists($baseStoragePath . 'icons')) {
-                mkdir($baseStoragePath . 'icons', 0777, true);
-            }
+            $this->createDirectories($baseStoragePath);
 
             // Procesar la imagen
-            if ($request->hasFile('img')) {
-                // Eliminar la imagen antigua si existe
-                if ($category->img && file_exists(public_path($category->img))) {
-                    unlink(public_path($category->img));
-                }
-
-                $fileName = time() . '_' . $request->file('img')->getClientOriginalName();
-                $request->file('img')->move($baseStoragePath . 'images/', $fileName);
-                $imgPath = 'storage/categories/images/' . $fileName;
-            }
+            $imgPath = $this->processField($request, 'img', $category->img, $baseStoragePath . 'images/');
 
             // Procesar el video
-            if ($request->hasFile('video')) {
-                // Eliminar el video antiguo si existe
-                if ($category->video && file_exists(public_path($category->video))) {
-                    unlink(public_path($category->video));
-                }
-
-                $fileName = time() . '_' . $request->file('video')->getClientOriginalName();
-                $request->file('video')->move($baseStoragePath . 'videos/', $fileName);
-                $videoPath = 'storage/categories/videos/' . $fileName;
-            }
+            $videoPath = $this->processField($request, 'video', $category->video, $baseStoragePath . 'videos/');
 
             // Procesar el icono
-            if ($request->hasFile('icon')) {
-                // Eliminar el icono antiguo si existe
-                if ($category->icon && file_exists(public_path($category->icon))) {
-                    unlink(public_path($category->icon));
-                }
-
-                $fileName = time() . '_' . $request->file('icon')->getClientOriginalName();
-                $request->file('icon')->move($baseStoragePath . 'icons/', $fileName);
-                $iconPath = 'storage/categories/icons/' . $fileName;
-            }
+            $iconPath = $this->processField($request, 'icon', $category->icon, $baseStoragePath . 'icons/');
 
             // Actualizar la categoría
             $category->update([
@@ -200,6 +151,65 @@ class ProductsCategoriesController extends Controller
             return ApiResponse::create('Categoría actualizada correctamente', 200, $category);
         } catch (Exception $e) {
             return ApiResponse::create('Error al actualizar la categoría', 500, ['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Crear directorios si no existen.
+     */
+    private function createDirectories($basePath)
+    {
+        if (!file_exists($basePath . 'images')) {
+            mkdir($basePath . 'images', 0777, true);
+        }
+
+        if (!file_exists($basePath . 'videos')) {
+            mkdir($basePath . 'videos', 0777, true);
+        }
+
+        if (!file_exists($basePath . 'icons')) {
+            mkdir($basePath . 'icons', 0777, true);
+        }
+    }
+
+    /**
+     * Procesar el campo que puede ser un archivo o un string.
+     */
+    private function processField($request, $fieldName, $oldPath, $destination)
+    {
+        // Verificar si es un archivo cargado
+        if ($request->hasFile($fieldName)) {
+            if ($oldPath && file_exists(public_path($oldPath))) {
+                unlink(public_path($oldPath));
+            }
+
+            $fileName = time() . '_' . $request->file($fieldName)->getClientOriginalName();
+            $request->file($fieldName)->move($destination, $fileName);
+            return 'storage/categories/' . basename($destination) . '/' . $fileName;
+        }
+
+        // Verificar si es un string (URL)
+        if (is_string($request->input($fieldName))) {
+            return $request->input($fieldName);
+        }
+
+        // Eliminar archivo si el valor es null y el archivo existía antes
+        if (is_null($request->input($fieldName)) && $oldPath) {
+            $this->deleteFile($oldPath);
+            return null;
+        }
+
+        // Retornar la ruta antigua si no hubo cambios
+        return $oldPath;
+    }
+
+    /**
+     * Eliminar un archivo de la ruta dada.
+     */
+    private function deleteFile($filePath)
+    {
+        if (file_exists(public_path($filePath))) {
+            unlink(public_path($filePath));
         }
     }
 
