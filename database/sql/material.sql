@@ -14,7 +14,7 @@ CREATE TABLE material_values (
     id_material INT NOT NULL,
     value VARCHAR(255) NOT NULL,
     img VARCHAR(255) DEFAULT NULL,
-    code VARCHAR(7) DEFAULT NULL,
+    color VARCHAR(7) DEFAULT NULL,
     created_at TIMESTAMP DEFAULT NULL,
     updated_at TIMESTAMP DEFAULT NULL,
     FOREIGN KEY (id_material) REFERENCES materials(id) ON DELETE CASCADE

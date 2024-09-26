@@ -34,7 +34,7 @@ class MaterialController extends Controller
                 'values' => 'nullable|array',
                 'values.*.value' => 'required_with:values|string|max:255',
                 'values.*.img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
-                'values.*.code' => 'nullable|string|max:255'
+                'values.*.color' => 'nullable|string|max:7'
             ]);
 
             if ($validator->fails()) {
@@ -84,7 +84,7 @@ class MaterialController extends Controller
                 'values.*.id' => 'sometimes|exists:material_values,id',
                 'values.*.value' => 'required_with:values|string|max:255',
                 'values.*.img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
-                'values.*.code' => 'nullable|string|max:255'
+                'values.*.color' => 'nullable|string|max:7'
             ]);
 
             if ($validator->fails()) {

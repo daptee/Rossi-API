@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\Attribute;
 use App\Models\AttributeValue;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 use Exception;
 
 class AttributeController extends Controller
@@ -31,7 +32,8 @@ class AttributeController extends Controller
                 'name' => 'required|string|max:255',
                 'status' => 'required|integer|exists:status,id',
                 'values' => 'nullable|array',
-                'values.*.value' => 'required_with:values|string|max:255'
+                'values.*.value' => 'required_with:values|string|max:255',
+                'values.*.color' => 'nullable|string|max:7'
             ]);
     
             if ($validator->fails()) {
@@ -63,7 +65,8 @@ class AttributeController extends Controller
                 'status' => 'required|integer|exists:status,id',
                 'values' => 'nullable|array',
                 'values.*.id' => 'sometimes|exists:attribute_values,id',
-                'values.*.value' => 'required_with:values|string|max:255'
+                'values.*.value' => 'required_with:values|string|max:255',
+                'values.*.color' => 'nullable|string|max:7'
             ]);
     
             if ($validator->fails()) {
