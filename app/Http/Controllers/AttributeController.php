@@ -35,20 +35,20 @@ class AttributeController extends Controller
                 'values.*.value' => 'required_with:values|string|max:255',
                 'values.*.color' => 'nullable|string|max:7'
             ]);
-    
+
             if ($validator->fails()) {
                 return ApiResponse::create('Validation failed', 422, $validator->errors());
             }
-    
+
             $attribute = Attribute::create($request->only('id_attribute', 'name', 'status'));
-    
+
             if ($request->has('values')) {
                 foreach ($request->values as $valueData) {
                     $valueData['id_attribute'] = $attribute->id;
                     AttributeValue::create($valueData);
                 }
             }
-    
+
             $attribute->load('values', 'status');
             return ApiResponse::create('Succeeded', 200, $attribute);
         } catch (Exception $e) {
@@ -68,14 +68,22 @@ class AttributeController extends Controller
                 'values.*.value' => 'required_with:values|string|max:255',
                 'values.*.color' => 'nullable|string|max:7'
             ]);
-    
+
             if ($validator->fails()) {
                 return ApiResponse::create('Validation failed', 422, $validator->errors());
             }
-    
+
             $attribute = Attribute::findOrFail($id);
             $attribute->update($request->only('id_attribute', 'name', 'status'));
-    
+
+            $receivedValueIds = $request->has('values') ? array_column($request->values, 'id') : [];
+
+            $existingValueIds = $attribute->values()->pluck('id')->toArray();
+
+            $valuesToDelete = array_diff($existingValueIds, $receivedValueIds);
+
+            AttributeValue::destroy($valuesToDelete);
+
             if ($request->has('values')) {
                 foreach ($request->values as $valueData) {
                     if (isset($valueData['id'])) {
@@ -87,7 +95,7 @@ class AttributeController extends Controller
                     }
                 }
             }
-    
+
             $attribute->load('values', 'status');
             return ApiResponse::create('Succeeded', 200, $attribute);
         } catch (Exception $e) {
