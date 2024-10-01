@@ -150,6 +150,25 @@ class MaterialController extends Controller
                 mkdir($baseStoragePath, 0777, true);
             }
 
+            // Obtener todos los ids de `values` enviados en la solicitud
+            $receivedValueIds = $request->has('values') ? array_column($request->values, 'id') : [];
+
+            // Obtener los ids de los `values` existentes en la base de datos
+            $existingValues = $material->values()->pluck('id')->toArray();
+
+            // Identificar los ids de `values` que deben ser eliminados (no presentes en la solicitud)
+            $valuesToDelete = array_diff($existingValues, $receivedValueIds);
+
+            // Eliminar los `values` que no están presentes en la solicitud
+            foreach ($valuesToDelete as $valueId) {
+                $valueToDelete = MaterialValue::findOrFail($valueId);
+                if ($valueToDelete->img) {
+                    // Eliminar la imagen asociada si existe
+                    $this->deleteFile($valueToDelete->img);
+                }
+                $valueToDelete->delete();
+            }
+
             // Manejo de valores (values) cuando no hay submateriales
             if ($request->has_submaterials === "false" && $request->has('values')) {
                 foreach ($request->values as $valueData) {
@@ -202,19 +221,13 @@ class MaterialController extends Controller
             if (array_key_exists('img', $valueData) && $valueData['img'] instanceof \Illuminate\Http\UploadedFile) {
                 // Eliminar la imagen anterior si existe
                 if ($value->img) {
-                    unlink(public_path($value->img));
+                    $this->deleteFile($value->img);
                 }
 
                 // Guardar la nueva imagen
                 $fileName = time() . '_' . $valueData['img']->getClientOriginalName();
                 $valueData['img']->move($baseStoragePath, $fileName);
                 $valueData['img'] = 'storage/materials/images/' . $fileName;
-            } elseif (!array_key_exists('img', $valueData)) {
-                // Si `img` no se envía en la solicitud, eliminar la imagen actual y establecer `img` como `null`
-                if ($value->img) {
-                    unlink(public_path($value->img));  // Eliminar la imagen si existe
-                }
-                $valueData['img'] = null;  // Establecer el valor de `img` como `null`
             }
 
             // Actualizar el valor con la información proporcionada
@@ -229,10 +242,11 @@ class MaterialController extends Controller
 
             // Si no se proporciona imagen en la creación, establecer `img` como `null`
             $valueData['id_material'] = $material->id;
-            $valueData['img'] = $valueData['img'] ?? null;  // Asegurar que `img` sea `null` si no se proporciona
+            $valueData['img'] = $valueData['img'] ?? null;
             MaterialValue::create($valueData);
         }
     }
+
 
     /**
      * Procesar la imagen que puede ser un archivo o un string.
