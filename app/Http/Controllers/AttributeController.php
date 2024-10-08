@@ -103,6 +103,28 @@ class AttributeController extends Controller
         }
     }
 
+    public function delete($id)
+    {
+        try {
+            // Encontrar el atributo a eliminar
+            $attribute = Attribute::findOrFail($id);
+
+            // Eliminar los valores asociados al atributo
+            $valuesToDelete = $attribute->values()->pluck('id')->toArray();
+            if (!empty($valuesToDelete)) {
+                AttributeValue::destroy($valuesToDelete);
+            }
+
+            // Eliminar el atributo
+            $attribute->delete();
+
+            return ApiResponse::create('Atributo eliminado correctamente', 200);
+        } catch (Exception $e) {
+            return ApiResponse::create('Error al eliminar el atributo', 500, ['error' => $e->getMessage()]);
+        }
+    }
+
+
     private function buildTree($attributes)
     {
         foreach ($attributes as $attribute) {

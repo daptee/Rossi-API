@@ -247,6 +247,37 @@ class MaterialController extends Controller
         }
     }
 
+    public function delete($id)
+    {
+        try {
+            // Buscar el material principal por su ID con relaciones
+            $material = Material::with('values', 'submaterials.values')->findOrFail($id);
+
+            // Eliminar físicamente las imágenes asociadas a los values del material principal
+            foreach ($material->values as $value) {
+                $this->deleteFile($value->img); // Eliminar imagen física
+                $value->delete(); // Marca el value como eliminado (soft delete)
+            }
+
+            // Eliminar físicamente las imágenes de los submateriales y sus values
+            foreach ($material->submaterials as $submaterial) {
+                // Eliminar cada value del submaterial
+                foreach ($submaterial->values as $subValue) {
+                    $this->deleteFile($subValue->img); // Eliminar imagen física
+                    $subValue->delete(); // Marca el value del submaterial como eliminado (soft delete)
+                }
+                $submaterial->delete(); // Marca el submaterial como eliminado (soft delete)
+            }
+
+            // Eliminar el material principal (soft delete)
+            $material->delete();
+
+            return ApiResponse::create('Material eliminados correctamente.', 200);
+        } catch (Exception $e) {
+            return ApiResponse::create('Error al eliminar el material', 500, ['error' => $e->getMessage()]);
+        }
+    }
+
 
     /**
      * Procesar la imagen que puede ser un archivo o un string.
@@ -260,13 +291,12 @@ class MaterialController extends Controller
     {
         // Verificar si es un archivo cargado
         if ($imageData instanceof \Illuminate\Http\UploadedFile) {
-            if ($oldPath && file_exists(public_path($oldPath))) {
-                unlink(public_path($oldPath));
-            }
+            // Si hay una imagen anterior, eliminarla
+            $this->deleteFile($oldPath);
 
             $fileName = time() . '_' . $imageData->getClientOriginalName();
             $imageData->move($destination, $fileName);
-            return 'storage/materials/images/' . $fileName;
+            return 'storage/materials/images/' . $fileName; // Ruta relativa para almacenar en la base de datos
         }
 
         // Verificar si es un string (URL) o un valor no nulo
@@ -283,6 +313,7 @@ class MaterialController extends Controller
         // Retornar la ruta antigua si no hubo cambios
         return $oldPath;
     }
+
 
     /**
      * Eliminar un archivo de la ruta dada.
