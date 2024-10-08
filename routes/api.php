@@ -38,6 +38,7 @@ Route::group([
     Route::get('/', [MaterialController::class, 'index']);
     Route::post('/', [MaterialController::class, 'store'])->middleware('admin');
     Route::post('/{id}', [MaterialController::class, 'update'])->middleware('admin');
+    Route::delete('/{id}', [MaterialController::class, 'delete'])->middleware('admin');
 });
 
 // Rutas de atributos
@@ -49,6 +50,7 @@ Route::group([
     Route::get('/', [AttributeController::class, 'index']);
     Route::post('/', [AttributeController::class, 'store'])->middleware('admin');
     Route::put('/{id}', [AttributeController::class, 'update'])->middleware('admin');
+    Route::delete('/{id}', [AttributeController::class, 'delete'])->middleware('admin');
 });
 
 // Rutas de productos
