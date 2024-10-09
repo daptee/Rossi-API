@@ -34,14 +34,14 @@ class MaterialController extends Controller
                 'has_submaterials' => 'required|in:true,false',
                 'values' => 'nullable|array',
                 'values.*.value' => 'required_with:values|string|max:255',
-                'values.*.img' => 'nullable',
+                'values.*.img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
                 'values.*.color' => 'nullable|string|max:7',
                 'submaterials' => 'nullable|array',
                 'submaterials.*.name' => 'required_with:submaterials|string|max:255',
                 'submaterials.*.status' => 'required_with:submaterials|integer|exists:status,id',
                 'submaterials.*.values' => 'nullable|array',
                 'submaterials.*.values.*.value' => 'required_with:submaterials.*.values|string|max:255',
-                'submaterials.*.values.*.img' => 'nullable',
+                'submaterials.*.values.*.img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
                 'submaterials.*.values.*.color' => 'nullable|string|max:7'
             ]);
 
