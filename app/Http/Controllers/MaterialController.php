@@ -113,7 +113,6 @@ class MaterialController extends Controller
     public function update(Request $request, $id)
     {
         try {
-            // Modificar la validación para img y hacerla opcional
             $validator = Validator::make($request->all(), [
                 'id_material' => 'nullable|exists:materials,id',
                 'name' => 'required|string|max:255',
@@ -142,44 +141,31 @@ class MaterialController extends Controller
             $material = Material::findOrFail($id);
             $material->update($request->only('id_material', 'name', 'status'));
 
-            // Definir la ruta base dentro de public/storage/materials/images
             $baseStoragePath = public_path('storage/materials/images/');
-
-            // Verificar si la carpeta existe, si no, crearla
             if (!file_exists($baseStoragePath)) {
                 mkdir($baseStoragePath, 0777, true);
             }
 
-            // Obtener todos los ids de `values` enviados en la solicitud
             $receivedValueIds = $request->has('values') ? array_column($request->values, 'id') : [];
-
-            // Obtener los ids de los `values` existentes en la base de datos
             $existingValues = $material->values()->pluck('id')->toArray();
-
-            // Identificar los ids de `values` que deben ser eliminados (no presentes en la solicitud)
             $valuesToDelete = array_diff($existingValues, $receivedValueIds);
 
-            // Eliminar los `values` que no están presentes en la solicitud
             foreach ($valuesToDelete as $valueId) {
                 $valueToDelete = MaterialValue::findOrFail($valueId);
                 if ($valueToDelete->img) {
-                    // Eliminar la imagen asociada si existe
                     $this->deleteFile($valueToDelete->img);
                 }
                 $valueToDelete->delete();
             }
 
-            // Manejo de valores (values) cuando no hay submateriales
             if ($request->has_submaterials === "false" && $request->has('values')) {
                 foreach ($request->values as $valueData) {
                     $this->saveOrUpdateMaterialValue($valueData, $material, $baseStoragePath);
                 }
             }
 
-            // Manejo de submateriales si hay submateriales presentes en la solicitud
             if ($request->has_submaterials === "true" && $request->has('submaterials')) {
                 foreach ($request->submaterials as $submaterialData) {
-                    // Verificar si se está actualizando un submaterial existente o creando uno nuevo
                     if (isset($submaterialData['id'])) {
                         $submaterial = Material::findOrFail($submaterialData['id']);
                         $submaterial->update($submaterialData);
@@ -188,7 +174,24 @@ class MaterialController extends Controller
                         $submaterial = Material::create($submaterialData);
                     }
 
-                    // Procesar los valores asociados al submaterial
+                    // Obtener todos los ids de `values` enviados en la solicitud para el submaterial
+                    $receivedSubValueIds = isset($submaterialData['values']) ? array_column($submaterialData['values'], 'id') : [];
+
+                    // Obtener los ids de los `values` existentes en la base de datos para el submaterial
+                    $existingSubValues = $submaterial->values()->pluck('id')->toArray();
+
+                    // Identificar los ids de `values` que deben ser eliminados (no presentes en la solicitud)
+                    $subValuesToDelete = array_diff($existingSubValues, $receivedSubValueIds);
+
+                    // Eliminar los `values` del submaterial que no están presentes en la solicitud
+                    foreach ($subValuesToDelete as $subValueId) {
+                        $subValueToDelete = MaterialValue::findOrFail($subValueId);
+                        if ($subValueToDelete->img) {
+                            $this->deleteFile($subValueToDelete->img);
+                        }
+                        $subValueToDelete->delete();
+                    }
+
                     if (isset($submaterialData['values'])) {
                         foreach ($submaterialData['values'] as $subValueData) {
                             $this->saveOrUpdateMaterialValue($subValueData, $submaterial, $baseStoragePath);
