@@ -164,7 +164,30 @@ class MaterialController extends Controller
                 }
             }
 
+            // Actualizar o eliminar submateriales
             if ($request->has_submaterials === "true" && $request->has('submaterials')) {
+                $receivedSubmaterialIds = array_column($request->submaterials, 'id');
+
+                // Obtener los submateriales existentes en la base de datos
+                $existingSubmaterials = $material->submaterials()->pluck('id')->toArray();
+
+                // Identificar submateriales a eliminar
+                $submaterialsToDelete = array_diff($existingSubmaterials, $receivedSubmaterialIds);
+
+                foreach ($submaterialsToDelete as $submaterialId) {
+                    $submaterialToDelete = Material::findOrFail($submaterialId);
+
+                    // Eliminar values asociados
+                    foreach ($submaterialToDelete->values as $subValue) {
+                        if ($subValue->img) {
+                            $this->deleteFile($subValue->img);
+                        }
+                        $subValue->delete();
+                    }
+                    $submaterialToDelete->delete();
+                }
+
+                // Actualizar o crear submateriales proporcionados
                 foreach ($request->submaterials as $submaterialData) {
                     if (isset($submaterialData['id'])) {
                         $submaterial = Material::findOrFail($submaterialData['id']);
@@ -174,16 +197,10 @@ class MaterialController extends Controller
                         $submaterial = Material::create($submaterialData);
                     }
 
-                    // Obtener todos los ids de `values` enviados en la solicitud para el submaterial
                     $receivedSubValueIds = isset($submaterialData['values']) ? array_column($submaterialData['values'], 'id') : [];
-
-                    // Obtener los ids de los `values` existentes en la base de datos para el submaterial
                     $existingSubValues = $submaterial->values()->pluck('id')->toArray();
-
-                    // Identificar los ids de `values` que deben ser eliminados (no presentes en la solicitud)
                     $subValuesToDelete = array_diff($existingSubValues, $receivedSubValueIds);
 
-                    // Eliminar los `values` del submaterial que no están presentes en la solicitud
                     foreach ($subValuesToDelete as $subValueId) {
                         $subValueToDelete = MaterialValue::findOrFail($subValueId);
                         if ($subValueToDelete->img) {
