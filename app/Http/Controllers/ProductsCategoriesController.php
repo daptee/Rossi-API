@@ -141,6 +141,8 @@ class ProductsCategoriesController extends Controller
             // Procesar el icono
             $iconPath = $this->processField($request, 'icon', $category->icon, $baseStoragePath . 'icons/');
 
+            $decodedData = json_decode($request->grid, true);
+
             // Actualizar la categoría
             $category->update([
                 'id_category' => $request->input('id_category'),
@@ -150,7 +152,7 @@ class ProductsCategoriesController extends Controller
                 'icon' => $iconPath,
                 'color' => $request->input('color'),
                 'status' => $request->input('status'),
-                'grid' => $request->input('grid'),
+                'grid' => $decodedData,
             ]);
 
             $category->load('status');
