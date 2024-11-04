@@ -39,6 +39,7 @@ class ProductsCategoriesController extends Controller
                 'icon' => 'nullable|file|mimes:svg,png|max:2048',
                 'color' => 'nullable|string',
                 'status' => 'required|integer|exists:status,id',
+                'grid' => 'required|json',
                 'id_category' => 'nullable|exists:products_categories,id',
             ]);
 
@@ -84,6 +85,7 @@ class ProductsCategoriesController extends Controller
                 'icon' => $iconPath,
                 'color' => $request->input('color'),
                 'status' => $request->input('status'),
+                'grid' => $request->input('grid'),
             ]);
 
             $category->save();
@@ -108,6 +110,7 @@ class ProductsCategoriesController extends Controller
                 'icon' => 'nullable',
                 'color' => 'nullable|string',
                 'status' => 'required|integer|exists:status,id',
+                'grid' => 'required|json',
                 'id_category' => 'nullable|exists:products_categories,id',
             ]);
 
@@ -144,6 +147,7 @@ class ProductsCategoriesController extends Controller
                 'icon' => $iconPath,
                 'color' => $request->input('color'),
                 'status' => $request->input('status'),
+                'grid' => $request->input('grid'),
             ]);
 
             $category->load('status');

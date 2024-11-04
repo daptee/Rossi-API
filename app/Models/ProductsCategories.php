@@ -18,7 +18,8 @@ class ProductsCategories extends Model
         'video',
         'icon',
         'color',
-        'status'
+        'status',
+        'grid'
     ];
 
     public function parent()
