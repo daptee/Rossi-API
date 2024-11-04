@@ -22,6 +22,10 @@ class ProductsCategories extends Model
         'grid'
     ];
 
+    protected $casts = [
+        'grid' => 'array',
+    ];
+
     public function parent()
     {
         return $this->belongsTo(ProductsCategories::class, 'id_category');
