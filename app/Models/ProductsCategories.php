@@ -18,7 +18,12 @@ class ProductsCategories extends Model
         'video',
         'icon',
         'color',
-        'status'
+        'status',
+        'grid'
+    ];
+
+    protected $casts = [
+        'grid' => 'array',
     ];
 
     public function parent()

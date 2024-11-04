@@ -32,6 +32,7 @@ class ProductsCategoriesController extends Controller
     public function store(Request $request)
     {
         try {
+
             $validator = Validator::make($request->all(), [
                 'category' => 'required|string|max:255',
                 'img' => 'nullable|file|mimes:jpg,jpeg,png|max:2048',
@@ -39,6 +40,7 @@ class ProductsCategoriesController extends Controller
                 'icon' => 'nullable|file|mimes:svg,png|max:2048',
                 'color' => 'nullable|string',
                 'status' => 'required|integer|exists:status,id',
+                'grid' => 'nullable|json',
                 'id_category' => 'nullable|exists:products_categories,id',
             ]);
 
@@ -84,6 +86,7 @@ class ProductsCategoriesController extends Controller
                 'icon' => $iconPath,
                 'color' => $request->input('color'),
                 'status' => $request->input('status'),
+                'grid' => $request->input('grid'),
             ]);
 
             $category->save();
@@ -108,6 +111,7 @@ class ProductsCategoriesController extends Controller
                 'icon' => 'nullable',
                 'color' => 'nullable|string',
                 'status' => 'required|integer|exists:status,id',
+                'grid' => 'required|json',
                 'id_category' => 'nullable|exists:products_categories,id',
             ]);
 
@@ -144,6 +148,7 @@ class ProductsCategoriesController extends Controller
                 'icon' => $iconPath,
                 'color' => $request->input('color'),
                 'status' => $request->input('status'),
+                'grid' => $request->input('grid'),
             ]);
 
             $category->load('status');
