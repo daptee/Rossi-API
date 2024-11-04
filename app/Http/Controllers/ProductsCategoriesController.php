@@ -77,6 +77,8 @@ class ProductsCategoriesController extends Controller
                 $iconPath = 'storage/categories/icons/' . $fileName;
             }
 
+            $decodedData = json_decode($request->grid, true);
+
             // Guardar la categoría en la base de datos
             $category = new ProductsCategories([
                 'id_category' => $request->input('id_category'),
@@ -86,7 +88,7 @@ class ProductsCategoriesController extends Controller
                 'icon' => $iconPath,
                 'color' => $request->input('color'),
                 'status' => $request->input('status'),
-                'grid' => $request->input('grid'),
+                'grid' => $decodedData,
             ]);
 
             $category->save();
