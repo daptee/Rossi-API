@@ -32,7 +32,6 @@ class ProductsCategoriesController extends Controller
     public function store(Request $request)
     {
         try {
-
             $validator = Validator::make($request->all(), [
                 'category' => 'required|string|max:255',
                 'img' => 'nullable|file|mimes:jpg,jpeg,png|max:2048',
@@ -52,32 +51,47 @@ class ProductsCategoriesController extends Controller
             $videoPath = null;
             $iconPath = null;
 
-            // Definir la ruta base dentro de public/storage/categories
             $baseStoragePath = public_path('storage/categories/');
             $this->createDirectories($baseStoragePath);
 
-            // Guardar la imagen
             if ($request->hasFile('img')) {
                 $fileName = time() . '_' . $request->file('img')->getClientOriginalName();
                 $request->file('img')->move($baseStoragePath . 'images/', $fileName);
                 $imgPath = 'storage/categories/images/' . $fileName;
             }
 
-            // Guardar el video
             if ($request->hasFile('video')) {
                 $fileName = time() . '_' . $request->file('video')->getClientOriginalName();
                 $request->file('video')->move($baseStoragePath . 'videos/', $fileName);
                 $videoPath = 'storage/categories/videos/' . $fileName;
             }
 
-            // Guardar el icono
             if ($request->hasFile('icon')) {
                 $fileName = time() . '_' . $request->file('icon')->getClientOriginalName();
                 $request->file('icon')->move($baseStoragePath . 'icons/', $fileName);
                 $iconPath = 'storage/categories/icons/' . $fileName;
             }
 
-            $decodedData = json_decode($request->grid, true);
+            $decodedGrid = json_decode($request->grid, true);
+
+            // Procesar archivos adicionales y asignarlos a los elementos de grid
+            for ($i = 1; $i <= 3; $i++) {
+                $fileKey = 'file_' . $i;
+                if ($request->hasFile($fileKey)) {
+                    $fileName = time() . '_' . $request->file($fileKey)->getClientOriginalName();
+                    $request->file($fileKey)->move($baseStoragePath . 'grid/', $fileName);
+                    $fileUrl = 'storage/categories/grid/' . $fileName;
+
+                    // Asignar la URL del archivo al elemento correspondiente en grid
+                    $gridItemId = (string) $i;
+                    foreach ($decodedGrid as &$gridItem) {
+                        if ($gridItem['id'] === $gridItemId) {
+                            $gridItem['props']['file']['url'] = $fileUrl;
+                            break;
+                        }
+                    }
+                }
+            }
 
             // Guardar la categoría en la base de datos
             $category = new ProductsCategories([
@@ -88,7 +102,7 @@ class ProductsCategoriesController extends Controller
                 'icon' => $iconPath,
                 'color' => $request->input('color'),
                 'status' => $request->input('status'),
-                'grid' => $decodedData,
+                'grid' => $decodedGrid,
             ]);
 
             $category->save();
@@ -100,17 +114,15 @@ class ProductsCategoriesController extends Controller
         }
     }
 
-
     // PUT
     public function update(Request $request, $id)
     {
         try {
-            // Validar solo la existencia y tipo básico de datos
             $validator = Validator::make($request->all(), [
                 'category' => 'required|string|max:255',
-                'img' => 'nullable',
-                'video' => 'nullable',
-                'icon' => 'nullable',
+                'img' => 'nullable|file|mimes:jpg,jpeg,png|max:2048',
+                'video' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
+                'icon' => 'nullable|file|mimes:svg,png|max:2048',
                 'color' => 'nullable|string',
                 'status' => 'required|integer|exists:status,id',
                 'grid' => 'required|json',
@@ -123,27 +135,42 @@ class ProductsCategoriesController extends Controller
 
             $category = ProductsCategories::findOrFail($id);
 
-            // Definir rutas de archivos actuales
-            $imgPath = $category->img;
-            $videoPath = $category->video;
-            $iconPath = $category->icon;
+            $imgPath = $this->processField($request, 'img', $category->img, public_path('storage/categories/images/'));
+            $videoPath = $this->processField($request, 'video', $category->video, public_path('storage/categories/videos/'));
+            $iconPath = $this->processField($request, 'icon', $category->icon, public_path('storage/categories/icons/'));
 
-            // Definir la ruta base para almacenamiento
-            $baseStoragePath = public_path('storage/categories/');
-            $this->createDirectories($baseStoragePath);
+            // Obtener la `grid` guardada y la `grid` nueva
+            $existingGridData = is_string($category->grid) ? json_decode($category->grid, true) : $category->grid;
+            $newGridData = is_string($request->grid) ? json_decode($request->grid, true) : $request->grid;
 
-            // Procesar la imagen
-            $imgPath = $this->processField($request, 'img', $category->img, $baseStoragePath . 'images/');
+            // Procesar archivos en la nueva `grid`
+            foreach ($newGridData as $key => &$newGridItem) {
+                $fileField = 'file_' . ($key + 1);
 
-            // Procesar el video
-            $videoPath = $this->processField($request, 'video', $category->video, $baseStoragePath . 'videos/');
+                // Obtener el archivo actual de la `grid` guardada si existe
+                $existingGridItem = $existingGridData[$key] ?? null;
+                $existingFileUrl = $existingGridItem['props']['file']['url'] ?? null;
 
-            // Procesar el icono
-            $iconPath = $this->processField($request, 'icon', $category->icon, $baseStoragePath . 'icons/');
+                if ($request->hasFile($fileField)) {
+                    // Si hay un archivo nuevo, elimina el archivo existente si es diferente
+                    if ($existingFileUrl && $existingFileUrl !== $newGridItem['props']['file']['url']) {
+                        $this->deleteFile($existingFileUrl);
+                    }
 
-            $decodedData = json_decode($request->grid, true);
+                    // Guardar el nuevo archivo
+                    $fileName = time() . '_' . $request->file($fileField)->getClientOriginalName();
+                    $request->file($fileField)->move(public_path('storage/categories/grid/'), $fileName);
 
-            // Actualizar la categoría
+                    // Actualizar la URL del archivo en la nueva `grid`
+                    $newGridItem['props']['file']['url'] = 'storage/categories/grid/' . $fileName;
+                } elseif ($existingFileUrl && !isset($newGridItem['props']['file']['url'])) {
+                    // Si no se envía un archivo nuevo pero había uno antiguo, eliminar el archivo antiguo
+                    $this->deleteFile($existingFileUrl);
+                    $newGridItem['props']['file']['url'] = null;
+                }
+            }
+
+            // Actualizar la categoría con la nueva información
             $category->update([
                 'id_category' => $request->input('id_category'),
                 'category' => $request->input('category'),
@@ -152,7 +179,7 @@ class ProductsCategoriesController extends Controller
                 'icon' => $iconPath,
                 'color' => $request->input('color'),
                 'status' => $request->input('status'),
-                'grid' => $decodedData,
+                'grid' => $newGridData,
             ]);
 
             $category->load('status');
