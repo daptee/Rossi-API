@@ -120,9 +120,9 @@ class ProductsCategoriesController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'category' => 'required|string|max:255',
-                'img' => 'nullable|file|mimes:jpg,jpeg,png|max:2048',
-                'video' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
-                'icon' => 'nullable|file|mimes:svg,png|max:2048',
+                'img' => 'nullable',
+                'video' => 'nullable',
+                'icon' => 'nullable',
                 'color' => 'nullable|string',
                 'status' => 'required|integer|exists:status,id',
                 'grid' => 'required|json',
