@@ -141,6 +141,9 @@ class ProductController extends Controller
                 'sku' => 'required|string|max:100|unique:products,sku',
                 'slug' => 'required|string|max:255|unique:products,slug',
                 'description' => 'nullable|string',
+                'description_bold' => 'nullable|required|in:1,0',
+                'description_italic' => 'nullable|required|in:1,0',
+                'description_underline' => 'nullable|required|in:1,0',
                 'status' => 'required|integer|exists:product_status,id',
                 'main_img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
                 'main_video' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
@@ -151,7 +154,8 @@ class ProductController extends Controller
                 'gallery' => 'array',
                 'gallery.*' => 'file|mimes:jpg,jpeg,png,mp4,mov,avi|max:10240',
                 'materials_values' => 'array',
-                'materials_values.*' => 'integer|exists:material_values,id',
+                'materials_values.*.id_material_value' => 'required|integer|exists:material_values,id',
+                'materials_values.*.img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
                 'attributes_values' => 'array',
                 'attributes_values.*.id_attribute_value' => 'required|integer|exists:attribute_values,id',
                 'attributes_values.*.img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
@@ -173,6 +177,9 @@ class ProductController extends Controller
                 'sku' => $request->sku,
                 'slug' => $request->slug,
                 'description' => $request->description,
+                'description_bold' => $request->description_bold,
+                'description_italic' => $request->description_italic,
+                'description_underline' => $request->description_underline,
                 'status' => $request->status,
                 'main_img' => $mainImgPath,
                 'main_video' => $mainVideoPath,
@@ -197,10 +204,12 @@ class ProductController extends Controller
 
             // Guardar materiales asociados al producto
             if ($request->has('materials_values')) {
-                foreach ($request->materials_values as $materialId) {
+                foreach ($request->materials_values as $material) {
+                    $materialImgPath = $request->hasFile('materials_values.*.img') ? $material['img']->store('products/materials', 'public') : null;
                     ProductMaterial::create([
                         'id_product' => $product->id,
-                        'id_material' => $materialId,
+                        'id_material' => $material['id_material_value'],
+                        'img' => $materialImgPath,
                     ]);
                 }
             }
@@ -284,9 +293,12 @@ class ProductController extends Controller
                 'sku' => 'required|string|max:100|unique:products,sku,' . $id,
                 'slug' => 'required|string|max:255|unique:products,slug,' . $id,
                 'description' => 'nullable|string',
+                'description_bold' => 'required|in:true,false',
+                'description_italic' => 'required|in:true,false',
+                'description_underline' => 'required|in:true,false',
                 'status' => 'required|integer|exists:status,id',
-                'main_img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
-                'main_video' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
+                'main_img' => 'nullable',
+                'main_video' => 'nullable',
                 'file_data_sheet' => 'nullable|file|mimes:pdf|max:5120',
                 'featured' => 'nullable|boolean',
                 'categories' => 'array',
@@ -294,10 +306,11 @@ class ProductController extends Controller
                 'gallery' => 'array',
                 'gallery.*' => 'file|mimes:jpg,jpeg,png,mp4,mov,avi|max:10240',
                 'materials_values' => 'array',
-                'materials_values.*' => 'integer|exists:material_values,id',
+                'materials_values.*.id_material_value' => 'required|integer|exists:material_values,id',
+                'materials_values.*.img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
                 'attributes_values' => 'array',
                 'attributes_values.*.id_attribute_value' => 'required|integer|exists:attribute_values,id',
-                'attributes_values.*.img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
+                'attributes_values.*.img' => 'nullable',
             ]);
 
             if ($validator->fails()) {
@@ -355,8 +368,13 @@ class ProductController extends Controller
             // Eliminar materiales y volver a crearlos
             ProductMaterial::where('id_product', $product->id)->delete();
             if ($request->has('materials_values')) {
-                foreach ($request->materials_values as $materialId) {
-                    ProductMaterial::create(['id_product' => $product->id, 'id_material' => $materialId]);
+                foreach ($request->materials_values as $material) {
+                    $materialImgPath = $request->hasFile('materials_values.*.img') ? $material['img']->store('products/materials', 'public') : null;
+                    ProductMaterial::create([
+                        'id_product' => $product->id,
+                        'id_material' => $material['id_material_value'],
+                        'img' => $materialImgPath,
+                    ]);
                 }
             }
 

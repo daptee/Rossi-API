@@ -1,4 +1,4 @@
-USE rossi_equipamientos;
+USE u290214683_rossi;
 
 SET FOREIGN_KEY_CHECKS = 0;
 
@@ -12,6 +12,9 @@ CREATE TABLE products (
     sku VARCHAR(100) NOT NULL,
     slug VARCHAR(255) NOT NULL,
     description TEXT,
+    description_bold BOOLEAN DEFAULT FALSE,
+    description_italic BOOLEAN DEFAULT FALSE,
+    description_underline BOOLEAN DEFAULT FALSE,
     status INT NOT NULL,
     main_img VARCHAR(255),
     main_video VARCHAR(255),
@@ -56,10 +59,11 @@ CREATE TABLE product_materials (
     id INT AUTO_INCREMENT PRIMARY KEY,
     id_product INT,
     id_material INT,
+    img VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (id_product) REFERENCES products(id) ON DELETE CASCADE,
-    FOREIGN KEY (id_material) REFERENCES materials(id) ON DELETE CASCADE
+    FOREIGN KEY (id_material) REFERENCES material_values(id) ON DELETE CASCADE
 );
 
 -- Tabla de atributos de productos
@@ -71,7 +75,7 @@ CREATE TABLE product_attributes (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (id_product) REFERENCES products(id) ON DELETE CASCADE,
-    FOREIGN KEY (id_attribute_value) REFERENCES attributes(id) ON DELETE CASCADE
+    FOREIGN KEY (id_attribute_value) REFERENCES attribute_values(id) ON DELETE CASCADE
 );
 
 -- Tabla de componentes de productos
