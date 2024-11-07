@@ -25,7 +25,7 @@ class ProductController extends Controller
             $category_id = $request->query('category_id');  // Obtén el category_id de la solicitud
 
             // Consulta inicial
-            $query = Product::select('products.id', 'products.name', 'products.main_img', 'products.status', 'products.featured', 'product_status.status_name')
+            $query = Product::select('products.id', 'products.name', 'products.main_img', 'products.status', 'products.featured', 'product_status.status_name', 'products.slug', 'products.created_at')
                 ->join('product_status', 'products.status', '=', 'product_status.id')
                 ->with([
                     'categories' => function ($query) {
@@ -79,6 +79,7 @@ class ProductController extends Controller
                 return [
                     'id' => $product->id,
                     'name' => $product->name,
+                    'slug' => $product->slug,
                     'main_img' => $product->main_img,
                     'status' => [
                         'id' => $product->status,
@@ -91,6 +92,7 @@ class ProductController extends Controller
                     'attributes_count' => $product->attributes_count,
                     'components_count' => $product->components_count,
                     'gallery_count' => $product->gallery_count,
+                    'created_date' => $product->created_at,
                 ];
             });
 
@@ -134,7 +136,7 @@ class ProductController extends Controller
                 'gallery',
                 'components'
             ])
-                ->select('id', 'name', 'description', 'main_img', 'main_video', 'file_data_sheet', 'status', 'featured')
+                ->select('id', 'name', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'main_video', 'file_data_sheet', 'status', 'featured')
                 ->findOrFail($id);
 
             // Limpia los datos del pivot para cada relación
