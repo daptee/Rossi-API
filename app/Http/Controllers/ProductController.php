@@ -19,17 +19,63 @@ use Exception;
 class ProductController extends Controller
 {
     // GET ALL (para admin)
-    public function indexAdmin()
+    public function indexAdmin(Request $request)
     {
         try {
-            // Consulta con join para obtener datos del estado del producto
-            $products = Product::select('products.id', 'products.name', 'products.main_img', 'products.status', 'products.featured', 'product_status.status_name')
-                ->join('product_status', 'products.status', '=', 'product_status.id')
-                ->withCount(['categories', 'materials', 'attributes', 'gallery', 'components'])
-                ->get();
+            $category_id = $request->query('category_id');  // Obtén el category_id de la solicitud
 
-            // Mapea cada producto para devolver solo los conteos y la información básica
+            // Consulta inicial
+            $query = Product::select('products.id', 'products.name', 'products.main_img', 'products.status', 'products.featured', 'product_status.status_name')
+                ->join('product_status', 'products.status', '=', 'product_status.id')
+                ->with([
+                    'categories' => function ($query) {
+                        $query->with('parent'); // Incluimos la relación 'parent' en categorías
+                    },
+                    'materials',
+                    'attributes',
+                    'gallery',
+                    'components'
+                ])
+                ->withCount(['categories', 'materials', 'attributes', 'gallery', 'components']);
+
+            // Si se recibe un category_id, filtramos los productos por la categoría
+            if ($category_id) {
+                $query->whereHas('categories', function ($query) use ($category_id) {
+                    // Filtramos por el id de categoría
+                    $query->where('products_categories.id', $category_id)
+                        ->orWhere('products_categories.id_category', $category_id);  // También incluye las subcategorías (padres)
+                });
+            }
+
+            // Ejecutamos la consulta
+            $products = $query->get();
+
+            // Mapea cada producto para devolver solo los conteos, la información básica y las categorías
             $products = $products->map(function ($product) {
+                $categories = collect();
+
+                foreach ($product->categories as $category) {
+                    if ($category->id_category) { // Si es una categoría hija
+                        // Agregamos la categoría padre si aún no está en la colección
+                        $parentCategory = $category->parent;
+                        if ($parentCategory && !$categories->contains('id', $parentCategory->id)) {
+                            $categories->push([
+                                'id' => $parentCategory->id,
+                                'category' => $parentCategory->category,
+                            ]);
+                        }
+                    }
+
+                    // Agregamos la categoría hija
+                    $categories->push([
+                        'id' => $category->id,
+                        'category' => $category->category,
+                    ]);
+                }
+
+                // Filtramos duplicados en caso de que se repita alguna categoría
+                $uniqueCategories = $categories->unique('id')->values();
+
                 return [
                     'id' => $product->id,
                     'name' => $product->name,
@@ -39,6 +85,7 @@ class ProductController extends Controller
                         'status_name' => $product->status_name,
                     ],
                     'featured' => $product->featured,
+                    'categories' => $uniqueCategories,
                     'categories_count' => $product->categories_count,
                     'materials_count' => $product->materials_count,
                     'attributes_count' => $product->attributes_count,
