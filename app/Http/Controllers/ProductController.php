@@ -25,7 +25,7 @@ class ProductController extends Controller
             $category_id = $request->query('category_id');  // Obtén el category_id de la solicitud
 
             // Consulta inicial
-            $query = Product::select('products.id', 'products.name', 'products.main_img', 'products.status', 'products.featured', 'product_status.status_name', 'products.slug', 'products.created_at')
+            $query = Product::select('products.id', 'products.name', 'products.main_img', 'products.status', 'products.featured', 'product_status.status_name', 'products.sku', 'products.created_at')
                 ->join('product_status', 'products.status', '=', 'product_status.id')
                 ->with([
                     'categories' => function ($query) {
@@ -79,7 +79,7 @@ class ProductController extends Controller
                 return [
                     'id' => $product->id,
                     'name' => $product->name,
-                    'slug' => $product->slug,
+                    'sku' => $product->sku,
                     'main_img' => $product->main_img,
                     'status' => [
                         'id' => $product->status,
