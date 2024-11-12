@@ -742,51 +742,102 @@ class ProductController extends Controller
         try {
             $product = Product::findOrFail($id);
 
-            // Eliminar la imagen principal si existe
-            if ($product->main_img && file_exists(public_path($product->main_img))) {
-                unlink(public_path($product->main_img));
-            }
-
-            // Eliminar el video principal si existe
-            if ($product->main_video && file_exists(public_path($product->main_video))) {
-                unlink(public_path($product->main_video));
-            }
-
-            // Eliminar el archivo de la ficha técnica si existe
-            if ($product->file_data_sheet && file_exists(public_path($product->file_data_sheet))) {
-                unlink(public_path($product->file_data_sheet));
-            }
-
-            // Eliminar las imágenes de la galería
-            foreach ($product->gallery as $galleryItem) {
-                if (file_exists(public_path($galleryItem->file))) {
-                    unlink(public_path($galleryItem->file));
+            // Intentar eliminar la imagen principal si existe
+            try {
+                if ($product->main_img && file_exists(public_path($product->main_img))) {
+                    unlink(public_path($product->main_img));
                 }
-                $galleryItem->delete(); // Eliminar el registro en la base de datos
+            } catch (Exception $e) {
+                Log::error("Error al eliminar la imagen principal: " . $e->getMessage());
             }
 
+            // Intentar eliminar el video principal si existe
+            try {
+                if ($product->main_video && file_exists(public_path($product->main_video))) {
+                    unlink(public_path($product->main_video));
+                }
+            } catch (Exception $e) {
+                Log::error("Error al eliminar el video principal: " . $e->getMessage());
+            }
+
+            // Intentar eliminar el archivo de la ficha técnica si existe
+            try {
+                if ($product->file_data_sheet && file_exists(public_path($product->file_data_sheet))) {
+                    unlink(public_path($product->file_data_sheet));
+                }
+            } catch (Exception $e) {
+                Log::error("Error al eliminar la ficha técnica: " . $e->getMessage());
+            }
+
+            // Intentar eliminar las imágenes de la galería
+            foreach ($product->gallery as $galleryItem) {
+                try {
+                    if (file_exists(public_path($galleryItem->file))) {
+                        unlink(public_path($galleryItem->file));
+                    }
+                    $galleryItem->delete(); // Eliminar el registro en la base de datos
+                } catch (Exception $e) {
+                    Log::error("Error al eliminar imagen de galería: " . $e->getMessage());
+                }
+            }
+
+            // Intentar eliminar imágenes de los atributos
             $product->attributes->each(function ($attribute) {
-                unlink(public_path($attribute->pivot->img));
+                try {
+                    if ($attribute->pivot->img && file_exists(public_path($attribute->pivot->img))) {
+                        unlink(public_path($attribute->pivot->img));
+                    }
+                } catch (Exception $e) {
+                    Log::error("Error al eliminar imagen de atributo: " . $e->getMessage());
+                }
             });
 
+            // Intentar eliminar imágenes de los materiales
             $product->materials->each(function ($material) {
-                unlink(public_path($material->pivot->img));
+                try {
+                    if ($material->pivot->img && file_exists(public_path($material->pivot->img))) {
+                        unlink(public_path($material->pivot->img));
+                    }
+                } catch (Exception $e) {
+                    Log::error("Error al eliminar imagen de material: " . $e->getMessage());
+                }
             });
 
-            // Eliminar las relaciones de categorías
-            $product->categories()->detach();
+            // Intentar eliminar las relaciones de categorías
+            try {
+                $product->categories()->detach();
+            } catch (Exception $e) {
+                Log::error("Error al eliminar relaciones de categorías: " . $e->getMessage());
+            }
 
-            // Eliminar las relaciones de materiales
-            $product->materials()->detach();
+            // Intentar eliminar las relaciones de materiales
+            try {
+                $product->materials()->detach();
+            } catch (Exception $e) {
+                Log::error("Error al eliminar relaciones de materiales: " . $e->getMessage());
+            }
 
-            // Eliminar las relaciones de componentes
-            $product->components()->detach();
+            // Intentar eliminar las relaciones de componentes
+            try {
+                $product->components()->detach();
+            } catch (Exception $e) {
+                Log::error("Error al eliminar relaciones de componentes: " . $e->getMessage());
+            }
 
-            // Eliminar las relaciones de atributos
-            $product->attributes()->detach();
+            // Intentar eliminar las relaciones de atributos
+            try {
+                $product->attributes()->detach();
+            } catch (Exception $e) {
+                Log::error("Error al eliminar relaciones de atributos: " . $e->getMessage());
+            }
 
-            // Eliminar el producto de la base de datos
-            $product->delete();
+            // Intentar eliminar el producto de la base de datos
+            try {
+                $product->delete();
+            } catch (Exception $e) {
+                Log::error("Error al eliminar el producto: " . $e->getMessage());
+                return ApiResponse::create('An error occurred while deleting the product.', 500);
+            }
 
             return ApiResponse::create('Producto eliminado correctamente.', 200);
         } catch (Exception $e) {
