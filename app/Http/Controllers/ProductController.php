@@ -583,11 +583,11 @@ class ProductController extends Controller
             
                     $materialImgPath = $existingMaterial ? $existingMaterial->img : null;
             
-                    // Verificar si se envía un archivo de imagen
+                    // Verificar si el material ya existe
                     if ($existingMaterial) {
-                        if ($material['img'] !== null && $request->hasFile("materials_values.$index.img")) {
-                            // Eliminar la imagen anterior solo si es diferente de la nueva
-                            if ($existingMaterial->img && file_exists(public_path($existingMaterial->img)) && $existingMaterial->img !== $material['img']) {
+                        if ($request->hasFile("materials_values.$index.img")) {
+                            // Si se envía una nueva imagen, eliminar la anterior si es diferente
+                            if ($existingMaterial->img && file_exists(public_path($existingMaterial->img))) {
                                 unlink(public_path($existingMaterial->img));
                             }
             
@@ -596,9 +596,13 @@ class ProductController extends Controller
                             $destinationPath = public_path('storage/products/materials/');
                             $request->file("materials_values.$index.img")->move($destinationPath, $randomName);
                             $materialImgPath = 'storage/products/materials/' . $randomName;
-                        } elseif ($material['img'] === null) {
-                            // No hacer nada si 'img' es null; conservamos la imagen existente
-                            $materialImgPath = $existingMaterial->img;
+            
+                        } elseif (!isset($material['img'])) {
+                            // Si 'img' no está definido, eliminar la imagen existente
+                            if ($existingMaterial->img && file_exists(public_path($existingMaterial->img))) {
+                                unlink(public_path($existingMaterial->img));
+                            }
+                            $materialImgPath = null; // Se elimina la referencia a la imagen
                         }
                     } else {
                         // Crear material nuevo con imagen solo si se ha enviado una
@@ -610,13 +614,13 @@ class ProductController extends Controller
                         }
                     }
             
-                    // Crear o actualizar la relación con la imagen actualizada o conservada
+                    // Crear o actualizar la relación con la imagen actualizada o eliminada
                     ProductMaterial::updateOrCreate(
                         ['id_product' => $product->id, 'id_material' => $material['id_material_value']],
                         ['img' => $materialImgPath]
                     );
                 }
-            }
+            }                     
 
             // Actualizar atributos asociados
             if ($request->has('attributes_values')) {
