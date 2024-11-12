@@ -545,85 +545,78 @@ class ProductController extends Controller
             }
 
             // Actualizar materiales asociados
-            // Si no se envía 'materials_values', eliminar todos los materiales asociados al producto
             if (!$request->has('materials_values') || empty($request->materials_values)) {
-    // Si no se envían materiales, eliminar todos los materiales asociados al producto
-    $productMaterials = ProductMaterial::where('id_product', $product->id)->get();
-
-    foreach ($productMaterials as $material) {
-        // Eliminar la imagen si existe
-        if ($material->img && file_exists(public_path($material->img))) {
-            unlink(public_path($material->img));
-        }
-
-        // Eliminar el registro de la base de datos
-        $material->delete();
-    }
-} else {
-    // Crear un array de IDs de materiales enviados
-    $sentMaterialIds = collect($request->materials_values)->pluck('id_material_value')->all();
-
-    // Eliminar materiales que ya no están en la solicitud
-    $existingMaterials = ProductMaterial::where('id_product', $product->id)->get();
-    foreach ($existingMaterials as $existingMaterial) {
-        if (!in_array($existingMaterial->id_material, $sentMaterialIds)) {
-            // Eliminar la imagen si existe
-            if ($existingMaterial->img && file_exists(public_path($existingMaterial->img))) {
-                unlink(public_path($existingMaterial->img));
-            }
-            // Eliminar el material del producto
-            $existingMaterial->delete();
-        }
-    }
-
-    // Procesar materiales enviados
-    foreach ($request->materials_values as $index => $material) {
-        $existingMaterial = ProductMaterial::where('id_product', $product->id)
-            ->where('id_material', $material['id_material_value'])
-            ->first();
-
-        $materialImgPath = $existingMaterial ? $existingMaterial->img : null;
-
-        // Verificar si se recibe una nueva imagen o si el valor de 'img' es una cadena
-        if ($existingMaterial) {
-            if (is_string($material['img']) && !empty($material['img'])) {
-                // Conservar la imagen existente si se recibe un string
-                $materialImgPath = $existingMaterial->img;
-            } elseif ($material['img'] !== null && $request->hasFile("materials_values.$index.img")) {
-                // Eliminar imagen anterior si es diferente de la nueva
-                if ($existingMaterial->img && file_exists(public_path($existingMaterial->img)) && $existingMaterial->img !== $material['img']) {
-                    unlink(public_path($existingMaterial->img));
+                // Si no se envían materiales, eliminar todos los materiales asociados al producto
+                $productMaterials = ProductMaterial::where('id_product', $product->id)->get();
+            
+                foreach ($productMaterials as $material) {
+                    // Eliminar la imagen si existe
+                    if ($material->img && file_exists(public_path($material->img))) {
+                        unlink(public_path($material->img));
+                    }
+            
+                    // Eliminar el registro de la base de datos
+                    $material->delete();
                 }
-
-                // Guardar nueva imagen
-                $randomName = uniqid() . '_' . $request->file("materials_values.$index.img")->getClientOriginalName();
-                $destinationPath = public_path('storage/products/materials/');
-                $request->file("materials_values.$index.img")->move($destinationPath, $randomName);
-                $materialImgPath = 'storage/products/materials/' . $randomName;
-            } elseif ($material['img'] === null) {
-                // Eliminar imagen si se pasa null
-                if ($existingMaterial->img && file_exists(public_path($existingMaterial->img))) {
-                    unlink(public_path($existingMaterial->img));
+            } else {
+                // Crear un array de IDs de materiales enviados
+                $sentMaterialIds = collect($request->materials_values)->pluck('id_material_value')->all();
+            
+                // Eliminar materiales que ya no están en la solicitud
+                $existingMaterials = ProductMaterial::where('id_product', $product->id)->get();
+                foreach ($existingMaterials as $existingMaterial) {
+                    if (!in_array($existingMaterial->id_material, $sentMaterialIds)) {
+                        // Eliminar la imagen si existe
+                        if ($existingMaterial->img && file_exists(public_path($existingMaterial->img))) {
+                            unlink(public_path($existingMaterial->img));
+                        }
+                        // Eliminar el material del producto
+                        $existingMaterial->delete();
+                    }
                 }
-                $materialImgPath = null;
+            
+                // Procesar materiales enviados
+                foreach ($request->materials_values as $index => $material) {
+                    $existingMaterial = ProductMaterial::where('id_product', $product->id)
+                        ->where('id_material', $material['id_material_value'])
+                        ->first();
+            
+                    $materialImgPath = $existingMaterial ? $existingMaterial->img : null;
+            
+                    // Verificar si se envía un archivo de imagen
+                    if ($existingMaterial) {
+                        if ($material['img'] !== null && $request->hasFile("materials_values.$index.img")) {
+                            // Eliminar la imagen anterior solo si es diferente de la nueva
+                            if ($existingMaterial->img && file_exists(public_path($existingMaterial->img)) && $existingMaterial->img !== $material['img']) {
+                                unlink(public_path($existingMaterial->img));
+                            }
+            
+                            // Guardar la nueva imagen
+                            $randomName = uniqid() . '_' . $request->file("materials_values.$index.img")->getClientOriginalName();
+                            $destinationPath = public_path('storage/products/materials/');
+                            $request->file("materials_values.$index.img")->move($destinationPath, $randomName);
+                            $materialImgPath = 'storage/products/materials/' . $randomName;
+                        } elseif ($material['img'] === null) {
+                            // No hacer nada si 'img' es null; conservamos la imagen existente
+                            $materialImgPath = $existingMaterial->img;
+                        }
+                    } else {
+                        // Crear material nuevo con imagen solo si se ha enviado una
+                        if ($request->hasFile("materials_values.$index.img")) {
+                            $randomName = uniqid() . '_' . $request->file("materials_values.$index.img")->getClientOriginalName();
+                            $destinationPath = public_path('storage/products/materials/');
+                            $request->file("materials_values.$index.img")->move($destinationPath, $randomName);
+                            $materialImgPath = 'storage/products/materials/' . $randomName;
+                        }
+                    }
+            
+                    // Crear o actualizar la relación con la imagen actualizada o conservada
+                    ProductMaterial::updateOrCreate(
+                        ['id_product' => $product->id, 'id_material' => $material['id_material_value']],
+                        ['img' => $materialImgPath]
+                    );
+                }
             }
-        } else {
-            // Crear material nuevo con imagen
-            if ($request->hasFile("materials_values.$index.img")) {
-                $randomName = uniqid() . '_' . $request->file("materials_values.$index.img")->getClientOriginalName();
-                $destinationPath = public_path('storage/products/materials/');
-                $request->file("materials_values.$index.img")->move($destinationPath, $randomName);
-                $materialImgPath = 'storage/products/materials/' . $randomName;
-            }
-        }
-
-        // Crear o actualizar la relación con la imagen actualizada o conservada
-        ProductMaterial::updateOrCreate(
-            ['id_product' => $product->id, 'id_material' => $material['id_material_value']],
-            ['img' => $materialImgPath]
-        );
-    }
-}
 
             // Actualizar atributos asociados
             if ($request->has('attributes_values')) {
