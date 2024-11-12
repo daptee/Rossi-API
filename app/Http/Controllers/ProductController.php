@@ -547,7 +547,7 @@ class ProductController extends Controller
             // Actualizar materiales asociados
             // Si no se envía 'materials_values', eliminar todos los materiales asociados al producto
             if (!$request->has('materials_values') || empty($request->materials_values)) {
-                // Obtener todos los materiales asociados al producto
+                // Si no se envían materiales, eliminar todos los materiales asociados al producto
                 $productMaterials = ProductMaterial::where('id_product', $product->id)->get();
 
                 foreach ($productMaterials as $material) {
@@ -560,24 +560,51 @@ class ProductController extends Controller
                     $material->delete();
                 }
             } else {
-                // Si se envían materiales, procesar como antes
+                // Crear un array de IDs de materiales enviados
+                $sentMaterialIds = collect($request->materials_values)->pluck('id_material_value')->all();
+
+                // Eliminar materiales que ya no están en la solicitud
+                $existingMaterials = ProductMaterial::where('id_product', $product->id)->get();
+                foreach ($existingMaterials as $existingMaterial) {
+                    if (!in_array($existingMaterial->id_material, $sentMaterialIds)) {
+                        // Eliminar la imagen si existe
+                        if ($existingMaterial->img && file_exists(public_path($existingMaterial->img))) {
+                            unlink(public_path($existingMaterial->img));
+                        }
+                        // Eliminar el material del producto
+                        $existingMaterial->delete();
+                    }
+                }
+
+                // Procesar materiales enviados
                 foreach ($request->materials_values as $index => $material) {
-                    // Obtener el material asociado al producto
                     $existingMaterial = ProductMaterial::where('id_product', $product->id)
                         ->where('id_material', $material['id_material_value'])
                         ->first();
-    
-                    // Variable para la nueva ruta de la imagen
+
                     $materialImgPath = null;
-    
+
                     // Verificar si el material existe y tiene una imagen asociada
-                    if ($existingMaterial && isset($material['img']) && $material['img'] !== null) {
-                        // Eliminar la imagen anterior si hay una imagen y es diferente de la nueva
-                        if ($existingMaterial->img && file_exists(public_path($existingMaterial->img)) && $existingMaterial->img !== $material['img']) {
-                            unlink(public_path($existingMaterial->img)); // Eliminar la imagen anterior
+                    if ($existingMaterial) {
+                        if ($material['img'] !== null && $request->hasFile("materials_values.$index.img")) {
+                            // Eliminar imagen anterior si es diferente de la nueva
+                            if ($existingMaterial->img && file_exists(public_path($existingMaterial->img)) && $existingMaterial->img !== $material['img']) {
+                                unlink(public_path($existingMaterial->img));
+                            }
+
+                            // Guardar nueva imagen
+                            $randomName = uniqid() . '_' . $request->file("materials_values.$index.img")->getClientOriginalName();
+                            $destinationPath = public_path('storage/products/materials/');
+                            $request->file("materials_values.$index.img")->move($destinationPath, $randomName);
+                            $materialImgPath = 'storage/products/materials/' . $randomName;
+                        } elseif ($material['img'] === null) {
+                            // Eliminar imagen si se pasa null
+                            if ($existingMaterial->img && file_exists(public_path($existingMaterial->img))) {
+                                unlink(public_path($existingMaterial->img));
+                            }
                         }
-    
-                        // Si se envía una nueva imagen (archivo), guardarla
+                    } else {
+                        // Crear material nuevo con imagen
                         if ($request->hasFile("materials_values.$index.img")) {
                             $randomName = uniqid() . '_' . $request->file("materials_values.$index.img")->getClientOriginalName();
                             $destinationPath = public_path('storage/products/materials/');
@@ -585,15 +612,7 @@ class ProductController extends Controller
                             $materialImgPath = 'storage/products/materials/' . $randomName;
                         }
                     }
-    
-                    // Si no hay imagen nueva pero se pasa null, se puede borrar la imagen
-                    if (isset($material['img']) && $material['img'] === null) {
-                        // Eliminar la imagen si se pasa null
-                        if ($existingMaterial && $existingMaterial->img && file_exists(public_path($existingMaterial->img))) {
-                            unlink(public_path($existingMaterial->img)); // Eliminar la imagen existente
-                        }
-                    }
-    
+
                     // Crear o actualizar la relación con la nueva imagen
                     ProductMaterial::updateOrCreate(
                         ['id_product' => $product->id, 'id_material' => $material['id_material_value']],
@@ -668,13 +687,13 @@ class ProductController extends Controller
             } else {
                 // Si no se envían attributes_values, eliminamos todos los atributos relacionados al producto
                 $existingAttributes = ProductAttribute::where('id_product', $product->id)->get();
-            
+
                 foreach ($existingAttributes as $attributeInstance) {
                     // Eliminar la imagen si existe
                     if ($attributeInstance->img && file_exists(public_path($attributeInstance->img))) {
                         unlink(public_path($attributeInstance->img));
                     }
-            
+
                     // Eliminar el atributo
                     $attributeInstance->delete();
                 }
@@ -723,51 +742,102 @@ class ProductController extends Controller
         try {
             $product = Product::findOrFail($id);
 
-            // Eliminar la imagen principal si existe
-            if ($product->main_img && file_exists(public_path($product->main_img))) {
-                unlink(public_path($product->main_img));
-            }
-
-            // Eliminar el video principal si existe
-            if ($product->main_video && file_exists(public_path($product->main_video))) {
-                unlink(public_path($product->main_video));
-            }
-
-            // Eliminar el archivo de la ficha técnica si existe
-            if ($product->file_data_sheet && file_exists(public_path($product->file_data_sheet))) {
-                unlink(public_path($product->file_data_sheet));
-            }
-
-            // Eliminar las imágenes de la galería
-            foreach ($product->gallery as $galleryItem) {
-                if (file_exists(public_path($galleryItem->file))) {
-                    unlink(public_path($galleryItem->file));
+            // Intentar eliminar la imagen principal si existe
+            try {
+                if ($product->main_img && file_exists(public_path($product->main_img))) {
+                    unlink(public_path($product->main_img));
                 }
-                $galleryItem->delete(); // Eliminar el registro en la base de datos
+            } catch (Exception $e) {
+                Log::error("Error al eliminar la imagen principal: " . $e->getMessage());
             }
 
+            // Intentar eliminar el video principal si existe
+            try {
+                if ($product->main_video && file_exists(public_path($product->main_video))) {
+                    unlink(public_path($product->main_video));
+                }
+            } catch (Exception $e) {
+                Log::error("Error al eliminar el video principal: " . $e->getMessage());
+            }
+
+            // Intentar eliminar el archivo de la ficha técnica si existe
+            try {
+                if ($product->file_data_sheet && file_exists(public_path($product->file_data_sheet))) {
+                    unlink(public_path($product->file_data_sheet));
+                }
+            } catch (Exception $e) {
+                Log::error("Error al eliminar la ficha técnica: " . $e->getMessage());
+            }
+
+            // Intentar eliminar las imágenes de la galería
+            foreach ($product->gallery as $galleryItem) {
+                try {
+                    if (file_exists(public_path($galleryItem->file))) {
+                        unlink(public_path($galleryItem->file));
+                    }
+                    $galleryItem->delete(); // Eliminar el registro en la base de datos
+                } catch (Exception $e) {
+                    Log::error("Error al eliminar imagen de galería: " . $e->getMessage());
+                }
+            }
+
+            // Intentar eliminar imágenes de los atributos
             $product->attributes->each(function ($attribute) {
-                unlink(public_path($attribute->pivot->img));
+                try {
+                    if ($attribute->pivot->img && file_exists(public_path($attribute->pivot->img))) {
+                        unlink(public_path($attribute->pivot->img));
+                    }
+                } catch (Exception $e) {
+                    Log::error("Error al eliminar imagen de atributo: " . $e->getMessage());
+                }
             });
 
+            // Intentar eliminar imágenes de los materiales
             $product->materials->each(function ($material) {
-                unlink(public_path($material->pivot->img));
+                try {
+                    if ($material->pivot->img && file_exists(public_path($material->pivot->img))) {
+                        unlink(public_path($material->pivot->img));
+                    }
+                } catch (Exception $e) {
+                    Log::error("Error al eliminar imagen de material: " . $e->getMessage());
+                }
             });
 
-            // Eliminar las relaciones de categorías
-            $product->categories()->detach();
+            // Intentar eliminar las relaciones de categorías
+            try {
+                $product->categories()->detach();
+            } catch (Exception $e) {
+                Log::error("Error al eliminar relaciones de categorías: " . $e->getMessage());
+            }
 
-            // Eliminar las relaciones de materiales
-            $product->materials()->detach();
+            // Intentar eliminar las relaciones de materiales
+            try {
+                $product->materials()->detach();
+            } catch (Exception $e) {
+                Log::error("Error al eliminar relaciones de materiales: " . $e->getMessage());
+            }
 
-            // Eliminar las relaciones de componentes
-            $product->components()->detach();
+            // Intentar eliminar las relaciones de componentes
+            try {
+                $product->components()->detach();
+            } catch (Exception $e) {
+                Log::error("Error al eliminar relaciones de componentes: " . $e->getMessage());
+            }
 
-            // Eliminar las relaciones de atributos
-            $product->attributes()->detach();
+            // Intentar eliminar las relaciones de atributos
+            try {
+                $product->attributes()->detach();
+            } catch (Exception $e) {
+                Log::error("Error al eliminar relaciones de atributos: " . $e->getMessage());
+            }
 
-            // Eliminar el producto de la base de datos
-            $product->delete();
+            // Intentar eliminar el producto de la base de datos
+            try {
+                $product->delete();
+            } catch (Exception $e) {
+                Log::error("Error al eliminar el producto: " . $e->getMessage());
+                return ApiResponse::create('An error occurred while deleting the product.', 500);
+            }
 
             return ApiResponse::create('Producto eliminado correctamente.', 200);
         } catch (Exception $e) {
