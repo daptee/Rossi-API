@@ -547,7 +547,7 @@ class ProductController extends Controller
             // Actualizar materiales asociados
             // Si no se envía 'materials_values', eliminar todos los materiales asociados al producto
             if (!$request->has('materials_values') || empty($request->materials_values)) {
-                // Obtener todos los materiales asociados al producto
+                // Si no se envían materiales, eliminar todos los materiales asociados al producto
                 $productMaterials = ProductMaterial::where('id_product', $product->id)->get();
 
                 foreach ($productMaterials as $material) {
@@ -560,24 +560,51 @@ class ProductController extends Controller
                     $material->delete();
                 }
             } else {
-                // Si se envían materiales, procesar como antes
+                // Crear un array de IDs de materiales enviados
+                $sentMaterialIds = collect($request->materials_values)->pluck('id_material_value')->all();
+
+                // Eliminar materiales que ya no están en la solicitud
+                $existingMaterials = ProductMaterial::where('id_product', $product->id)->get();
+                foreach ($existingMaterials as $existingMaterial) {
+                    if (!in_array($existingMaterial->id_material, $sentMaterialIds)) {
+                        // Eliminar la imagen si existe
+                        if ($existingMaterial->img && file_exists(public_path($existingMaterial->img))) {
+                            unlink(public_path($existingMaterial->img));
+                        }
+                        // Eliminar el material del producto
+                        $existingMaterial->delete();
+                    }
+                }
+
+                // Procesar materiales enviados
                 foreach ($request->materials_values as $index => $material) {
-                    // Obtener el material asociado al producto
                     $existingMaterial = ProductMaterial::where('id_product', $product->id)
                         ->where('id_material', $material['id_material_value'])
                         ->first();
-    
-                    // Variable para la nueva ruta de la imagen
+
                     $materialImgPath = null;
-    
+
                     // Verificar si el material existe y tiene una imagen asociada
-                    if ($existingMaterial && isset($material['img']) && $material['img'] !== null) {
-                        // Eliminar la imagen anterior si hay una imagen y es diferente de la nueva
-                        if ($existingMaterial->img && file_exists(public_path($existingMaterial->img)) && $existingMaterial->img !== $material['img']) {
-                            unlink(public_path($existingMaterial->img)); // Eliminar la imagen anterior
+                    if ($existingMaterial) {
+                        if ($material['img'] !== null && $request->hasFile("materials_values.$index.img")) {
+                            // Eliminar imagen anterior si es diferente de la nueva
+                            if ($existingMaterial->img && file_exists(public_path($existingMaterial->img)) && $existingMaterial->img !== $material['img']) {
+                                unlink(public_path($existingMaterial->img));
+                            }
+
+                            // Guardar nueva imagen
+                            $randomName = uniqid() . '_' . $request->file("materials_values.$index.img")->getClientOriginalName();
+                            $destinationPath = public_path('storage/products/materials/');
+                            $request->file("materials_values.$index.img")->move($destinationPath, $randomName);
+                            $materialImgPath = 'storage/products/materials/' . $randomName;
+                        } elseif ($material['img'] === null) {
+                            // Eliminar imagen si se pasa null
+                            if ($existingMaterial->img && file_exists(public_path($existingMaterial->img))) {
+                                unlink(public_path($existingMaterial->img));
+                            }
                         }
-    
-                        // Si se envía una nueva imagen (archivo), guardarla
+                    } else {
+                        // Crear material nuevo con imagen
                         if ($request->hasFile("materials_values.$index.img")) {
                             $randomName = uniqid() . '_' . $request->file("materials_values.$index.img")->getClientOriginalName();
                             $destinationPath = public_path('storage/products/materials/');
@@ -585,15 +612,7 @@ class ProductController extends Controller
                             $materialImgPath = 'storage/products/materials/' . $randomName;
                         }
                     }
-    
-                    // Si no hay imagen nueva pero se pasa null, se puede borrar la imagen
-                    if (isset($material['img']) && $material['img'] === null) {
-                        // Eliminar la imagen si se pasa null
-                        if ($existingMaterial && $existingMaterial->img && file_exists(public_path($existingMaterial->img))) {
-                            unlink(public_path($existingMaterial->img)); // Eliminar la imagen existente
-                        }
-                    }
-    
+
                     // Crear o actualizar la relación con la nueva imagen
                     ProductMaterial::updateOrCreate(
                         ['id_product' => $product->id, 'id_material' => $material['id_material_value']],
@@ -668,13 +687,13 @@ class ProductController extends Controller
             } else {
                 // Si no se envían attributes_values, eliminamos todos los atributos relacionados al producto
                 $existingAttributes = ProductAttribute::where('id_product', $product->id)->get();
-            
+
                 foreach ($existingAttributes as $attributeInstance) {
                     // Eliminar la imagen si existe
                     if ($attributeInstance->img && file_exists(public_path($attributeInstance->img))) {
                         unlink(public_path($attributeInstance->img));
                     }
-            
+
                     // Eliminar el atributo
                     $attributeInstance->delete();
                 }
