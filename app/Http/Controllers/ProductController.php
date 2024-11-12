@@ -25,7 +25,7 @@ class ProductController extends Controller
             $category_id = $request->query('category_id');  // Obtén el category_id de la solicitud
 
             // Consulta inicial
-            $query = Product::select('products.id', 'products.name', 'products.main_img', 'products.status', 'products.featured', 'product_status.status_name', 'products.sku', 'products.created_at')
+            $query = Product::select('products.id', 'products.name', 'products.main_img', 'products.status', 'products.featured', 'product_status.status_name', 'products.sku', 'products.slug', 'products.created_at')
                 ->join('product_status', 'products.status', '=', 'product_status.id')
                 ->with([
                     'categories' => function ($query) {
@@ -136,7 +136,7 @@ class ProductController extends Controller
                 'gallery',
                 'components'
             ])
-                ->select('id', 'name', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'main_video', 'file_data_sheet', 'status', 'featured')
+                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'main_video', 'file_data_sheet', 'status', 'featured')
                 ->findOrFail($id);
 
             // Limpia los datos del pivot para cada relación
@@ -217,10 +217,28 @@ class ProductController extends Controller
                 return ApiResponse::create('Validation failed', 422, $validator->errors());
             }
 
-            // Guardar archivos de imágenes y videos
-            $mainImgPath = $request->hasFile('main_img') ? $request->file('main_img')->store('products/images', 'public') : null;
-            $mainVideoPath = $request->hasFile('main_video') ? $request->file('main_video')->store('products/videos', 'public') : null;
-            $fileDataSheetPath = $request->hasFile('file_data_sheet') ? $request->file('file_data_sheet')->store('products/data_sheets', 'public') : null;
+            // Rutas base en la carpeta public
+            $baseStoragePath = public_path('storage/products');
+
+            // Crear directorios si no existen
+            if (!file_exists("$baseStoragePath/images"))
+                mkdir("$baseStoragePath/images", 0755, true);
+            if (!file_exists("$baseStoragePath/videos"))
+                mkdir("$baseStoragePath/videos", 0755, true);
+            if (!file_exists("$baseStoragePath/data_sheets"))
+                mkdir("$baseStoragePath/data_sheets", 0755, true);
+            if (!file_exists("$baseStoragePath/gallery"))
+                mkdir("$baseStoragePath/gallery", 0755, true);
+            if (!file_exists("$baseStoragePath/materials"))
+                mkdir("$baseStoragePath/materials", 0755, true);
+            if (!file_exists("$baseStoragePath/attributes"))
+                mkdir("$baseStoragePath/attributes", 0755, true);
+
+            // Almacenar archivos principales en la carpeta 'public/storage/products'
+            // Almacenar archivos principales en la carpeta 'public/storage/products'
+            $mainImgPath = $request->hasFile('main_img') ? $request->file('main_img')->move("$baseStoragePath/images", uniqid() . '_' . $request->file('main_img')->getClientOriginalName()) : null;
+            $mainVideoPath = $request->hasFile('main_video') ? $request->file('main_video')->move("$baseStoragePath/videos", uniqid() . '_' . $request->file('main_video')->getClientOriginalName()) : null;
+            $fileDataSheetPath = $request->hasFile('file_data_sheet') ? $request->file('file_data_sheet')->move("$baseStoragePath/data_sheets", uniqid() . '_' . $request->file('file_data_sheet')->getClientOriginalName()) : null;
 
             $product = Product::create([
                 'name' => $request->name,
@@ -231,60 +249,60 @@ class ProductController extends Controller
                 'description_italic' => $request->description_italic,
                 'description_underline' => $request->description_underline,
                 'status' => $request->status,
-                'main_img' => $mainImgPath,
-                'main_video' => $mainVideoPath,
-                'file_data_sheet' => $fileDataSheetPath,
+                'main_img' => $mainImgPath ? "storage/products/images/" . basename($mainImgPath) : null,
+                'main_video' => $mainVideoPath ? "storage/products/videos/" . basename($mainVideoPath) : null,
+                'file_data_sheet' => $fileDataSheetPath ? "storage/products/data_sheets/" . basename($fileDataSheetPath) : null,
                 'featured' => $request->featured,
             ]);
 
-            // Guardar imágenes en la galería
+
+            // Guardar archivos en la galería
             if ($request->has('gallery')) {
                 foreach ($request->gallery as $file) {
-                    $filePath = $file->store('products/gallery', 'public');
-                    ProductGallery::create(['id_product' => $product->id, 'file' => $filePath]);
+                    $uniqueName = uniqid() . '_' . $file->getClientOriginalName();
+                    $filePath = $file->move("$baseStoragePath/gallery", $uniqueName);
+                    ProductGallery::create(['id_product' => $product->id, 'file' => "storage/products/gallery/" . $uniqueName]);
                 }
             }
 
-            // Guardar categorías asociadas al producto
+            // Asociar categorías al producto
             if ($request->has('categories')) {
                 foreach ($request->categories as $categoryId) {
                     ProductCategory::create(['id_product' => $product->id, 'id_categorie' => $categoryId]);
                 }
             }
 
-            // Guardar materiales asociados al producto
+            // Guardar materiales asociados
             if ($request->has('materials_values')) {
                 foreach ($request->materials_values as $index => $material) {
-                    // Verificar si existe una imagen para el material específico
                     $materialImgPath = isset($material['img']) && $request->hasFile("materials_values.$index.img")
-                        ? $request->file("materials_values.$index.img")->store('products/materials', 'public')
+                        ? $request->file("materials_values.$index.img")->move("$baseStoragePath/materials", uniqid() . '_' . $request->file("materials_values.$index.img")->getClientOriginalName())
                         : null;
 
                     ProductMaterial::create([
                         'id_product' => $product->id,
                         'id_material' => $material['id_material_value'],
-                        'img' => $materialImgPath,
+                        'img' => $materialImgPath ? "storage/products/materials/" . basename($materialImgPath) : null,
                     ]);
                 }
             }
 
-            // Guardar atributos asociados al producto
+            // Guardar atributos asociados
             if ($request->has('attributes_values')) {
                 foreach ($request->attributes_values as $index => $attribute) {
-                    // Verificar si existe una imagen para el atributo específico
                     $attributeImgPath = isset($attribute['img']) && $request->hasFile("attributes_values.$index.img")
-                        ? $request->file("attributes_values.$index.img")->store('products/attributes', 'public')
+                        ? $request->file("attributes_values.$index.img")->move("$baseStoragePath/attributes", uniqid() . '_' . $request->file("attributes_values.$index.img")->getClientOriginalName())
                         : null;
 
                     ProductAttribute::create([
                         'id_product' => $product->id,
                         'id_attribute_value' => $attribute['id_attribute_value'],
-                        'img' => $attributeImgPath,
+                        'img' => $attributeImgPath ? "storage/products/attributes/" . basename($attributeImgPath) : null,
                     ]);
                 }
             }
 
-            // Guardar componentes asociados al producto
+            // Asociar componentes al producto
             if ($request->has('components')) {
                 foreach ($request->components as $componentId) {
                     ProductComponent::create(['id_product' => $product->id, 'id_component' => $componentId]);
@@ -297,50 +315,33 @@ class ProductController extends Controller
                 'attributes.attribute',
                 'gallery',
                 'components'
-            ])
-                ->findOrFail($product->id);
+            ])->findOrFail($product->id);
 
             // Limpiar datos del pivot para cada relación
             $product->categories->each(function ($category) {
                 unset($category->pivot);
             });
-
             $product->materials->each(function ($material) {
                 $material->img_value = $material->pivot->img;
                 unset($material->pivot);
             });
-
             $product->attributes->each(function ($attribute) {
                 $attribute->img = $attribute->pivot->img;
                 unset($attribute->pivot);
             });
-
             $product->components->each(function ($component) {
                 unset($component->pivot);
             });
 
-            // Obtener el nombre del estado del producto desde la tabla product_status
             $status = ProductStatus::find($product->status);
-
-            // Si se encuentra el estado, agrega su nombre al producto
-            if ($status) {
-                $product->status = [
-                    'id' => $status->id,
-                    'status_name' => $status->status_name
-                ];
-            } else {
-                // Si no se encuentra el estado, puedes definir un valor por defecto o manejar el error
-                $product->status = [
-                    'id' => $product->status,
-                    'status_name' => 'Unknown' // O cualquier valor por defecto
-                ];
-            }
+            $product->status = $status ? ['id' => $status->id, 'status_name' => $status->status_name] : ['id' => $product->status, 'status_name' => 'Unknown'];
 
             return ApiResponse::create('Producto creado correctamente', 200, $product);
         } catch (Exception $e) {
             return ApiResponse::create('Error al crear producto', 500, ['error' => $e->getMessage()]);
         }
     }
+
 
     public function update(Request $request, $id)
     {
@@ -382,48 +383,79 @@ class ProductController extends Controller
 
             $product = Product::findOrFail($id);
 
+            $baseStoragePath = public_path('storage/products');
+
+            // Crear directorios si no existen
+            if (!file_exists("$baseStoragePath/images"))
+                mkdir("$baseStoragePath/images", 0755, true);
+            if (!file_exists("$baseStoragePath/videos"))
+                mkdir("$baseStoragePath/videos", 0755, true);
+            if (!file_exists("$baseStoragePath/data_sheets"))
+                mkdir("$baseStoragePath/data_sheets", 0755, true);
+            if (!file_exists("$baseStoragePath/gallery"))
+                mkdir("$baseStoragePath/gallery", 0755, true);
+            if (!file_exists("$baseStoragePath/materials"))
+                mkdir("$baseStoragePath/materials", 0755, true);
+            if (!file_exists("$baseStoragePath/attributes"))
+                mkdir("$baseStoragePath/attributes", 0755, true);
+
             // Manejo de main_img
             if ($request->has('main_img')) {
                 if (is_null($request->main_img)) {
-                    if ($product->main_img && Storage::disk('public')->exists($product->main_img)) {
-                        Storage::disk('public')->delete($product->main_img);
+                    if ($product->main_img && file_exists(public_path($product->main_img))) {
+                        unlink(public_path($product->main_img));
                     }
                     $product->main_img = null;
                 } elseif ($request->hasFile('main_img')) {
-                    if ($product->main_img && Storage::disk('public')->exists($product->main_img)) {
-                        Storage::disk('public')->delete($product->main_img);
+                    if ($product->main_img && file_exists(public_path($product->main_img))) {
+                        unlink(public_path($product->main_img));
                     }
-                    $product->main_img = $request->file('main_img')->store('products/images', 'public');
+
+                    // Generar nombre aleatorio
+                    $randomName = uniqid() . '_' . $request->file('main_img')->getClientOriginalName();
+                    $destinationPath = public_path('storage/products/images/');
+                    $request->file('main_img')->move($destinationPath, $randomName);
+                    $product->main_img = 'storage/products/images/' . $randomName;
                 }
             }
 
             // Manejo de main_video
             if ($request->has('main_video')) {
                 if (is_null($request->main_video)) {
-                    if ($product->main_video && Storage::disk('public')->exists($product->main_video)) {
-                        Storage::disk('public')->delete($product->main_video);
+                    if ($product->main_video && file_exists(public_path($product->main_video))) {
+                        unlink(public_path($product->main_video));
                     }
                     $product->main_video = null;
                 } elseif ($request->hasFile('main_video')) {
-                    if ($product->main_video && Storage::disk('public')->exists($product->main_video)) {
-                        Storage::disk('public')->delete($product->main_video);
+                    if ($product->main_video && file_exists(public_path($product->main_video))) {
+                        unlink(public_path($product->main_video));
                     }
-                    $product->main_video = $request->file('main_video')->store('products/videos', 'public');
+
+                    // Generar nombre aleatorio
+                    $randomName = uniqid() . '_' . $request->file('main_video')->getClientOriginalName();
+                    $destinationPath = public_path('storage/products/videos/');
+                    $request->file('main_video')->move($destinationPath, $randomName);
+                    $product->main_video = 'storage/products/videos/' . $randomName;
                 }
             }
 
             // Manejo de file_data_sheet
             if ($request->has('file_data_sheet')) {
                 if (is_null($request->file_data_sheet)) {
-                    if ($product->file_data_sheet && Storage::disk('public')->exists($product->file_data_sheet)) {
-                        Storage::disk('public')->delete($product->file_data_sheet);
+                    if ($product->file_data_sheet && file_exists(public_path($product->file_data_sheet))) {
+                        unlink(public_path($product->file_data_sheet));
                     }
                     $product->file_data_sheet = null;
                 } elseif ($request->hasFile('file_data_sheet')) {
-                    if ($product->file_data_sheet && Storage::disk('public')->exists($product->file_data_sheet)) {
-                        Storage::disk('public')->delete($product->file_data_sheet);
+                    if ($product->file_data_sheet && file_exists(public_path($product->file_data_sheet))) {
+                        unlink(public_path($product->file_data_sheet));
                     }
-                    $product->file_data_sheet = $request->file('file_data_sheet')->store('products/data_sheets', 'public');
+
+                    // Generar nombre aleatorio
+                    $randomName = uniqid() . '_' . $request->file('file_data_sheet')->getClientOriginalName();
+                    $destinationPath = public_path('storage/products/data_sheets/');
+                    $request->file('file_data_sheet')->move($destinationPath, $randomName);
+                    $product->file_data_sheet = 'storage/products/data_sheets/' . $randomName;
                 }
             }
 
@@ -446,12 +478,12 @@ class ProductController extends Controller
             if ($request->has('gallery')) {
                 // Obtener los IDs actuales de la galería
                 $currentGalleryIds = $product->gallery->pluck('id')->toArray();
-            
+
                 // Crear un array de IDs que se enviaron en la solicitud
                 $sentGalleryIds = array_filter(array_map(function ($galleryItem) {
                     return isset($galleryItem['id']) ? $galleryItem['id'] : null;
                 }, $request->gallery));
-            
+
                 // Filtrar los elementos de la galería enviados
                 foreach ($request->gallery as $galleryItem) {
                     // Si el galleryItem tiene 'id' y 'file', manejamos las actualizaciones
@@ -460,57 +492,146 @@ class ProductController extends Controller
                         if (is_string($galleryItem['file'])) {
                             continue;  // No se hace nada si el archivo es el mismo
                         }
-            
+
                         $gallery = ProductGallery::findOrFail($galleryItem['id']);
-                        
+
                         // Si el 'file' ha cambiado (es un archivo), eliminamos la imagen antigua
-                        if (Storage::disk('public')->exists($gallery->file)) {
-                            Storage::disk('public')->delete($gallery->file);
+                        if (file_exists(public_path($gallery->file))) {
+                            unlink(public_path($gallery->file));
                         }
-            
+
                         // Guardamos la nueva imagen
-                        $newFilePath = $galleryItem['file']->store('products/gallery', 'public');
-                        $gallery->update(['file' => $newFilePath]);
+                        $randomName = uniqid() . '_' . $galleryItem['file']->getClientOriginalName();
+                        $destinationPath = public_path('storage/products/gallery/');
+                        $galleryItem['file']->move($destinationPath, $randomName);
+                        $gallery->update(['file' => 'storage/products/gallery/' . $randomName]);
                     }
-            
+
                     // Si el 'id' está vacío, es una nueva imagen, se sube el archivo
                     if (empty($galleryItem['id']) && isset($galleryItem['file'])) {
-                        $filePath = $galleryItem['file']->store('products/gallery', 'public');
-                        $product->gallery()->create(['file' => $filePath]);
+                        $randomName = uniqid() . '_' . $galleryItem['file']->getClientOriginalName();
+                        $destinationPath = public_path('storage/products/gallery/');
+                        $galleryItem['file']->move($destinationPath, $randomName);
+                        $product->gallery()->create(['file' => 'storage/products/gallery/' . $randomName]);
                     }
-            
+
                     // Si el 'id' está presente y el 'file' es null, eliminamos la imagen correspondiente
                     if (isset($galleryItem['id']) && $galleryItem['file'] === null) {
                         $gallery = ProductGallery::findOrFail($galleryItem['id']);
-            
+
                         // Eliminar la imagen
-                        if (Storage::disk('public')->exists($gallery->file)) {
-                            Storage::disk('public')->delete($gallery->file);
+                        if (file_exists(public_path($gallery->file))) {
+                            unlink(public_path($gallery->file));
                         }
-            
+
                         $gallery->delete();
                     }
                 }
-            
+
                 // Eliminar las imágenes cuyo ID no está presente en la lista de IDs enviados
                 $idsToDelete = array_diff($currentGalleryIds, $sentGalleryIds);
-            
+
                 // Eliminar las imágenes correspondientes
                 foreach ($idsToDelete as $id) {
                     $gallery = ProductGallery::findOrFail($id);
-            
+
                     // Eliminar la imagen de la galería
-                    if (Storage::disk('public')->exists($gallery->file)) {
-                        Storage::disk('public')->delete($gallery->file);
+                    if (file_exists(public_path($gallery->file))) {
+                        unlink(public_path($gallery->file));
                     }
-            
+
                     $gallery->delete();
                 }
-            }                      
+            }
 
+            // Actualizar materiales asociados
+            // Si no se envía 'materials_values', eliminar todos los materiales asociados al producto
+            if (!$request->has('materials_values') || empty($request->materials_values)) {
+                // Obtener todos los materiales asociados al producto
+                $productMaterials = ProductMaterial::where('id_product', $product->id)->get();
+
+                foreach ($productMaterials as $material) {
+                    // Eliminar la imagen si existe
+                    if ($material->img && file_exists(public_path($material->img))) {
+                        unlink(public_path($material->img));
+                    }
+
+                    // Eliminar el registro de la base de datos
+                    $material->delete();
+                }
+            } else {
+                // Si se envían materiales, procesar como antes
+                foreach ($request->materials_values as $index => $material) {
+                    // Obtener el material asociado al producto
+                    $existingMaterial = ProductMaterial::where('id_product', $product->id)
+                        ->where('id_material', $material['id_material_value'])
+                        ->first();
+    
+                    // Variable para la nueva ruta de la imagen
+                    $materialImgPath = null;
+    
+                    // Verificar si el material existe y tiene una imagen asociada
+                    if ($existingMaterial && isset($material['img']) && $material['img'] !== null) {
+                        // Eliminar la imagen anterior si hay una imagen y es diferente de la nueva
+                        if ($existingMaterial->img && file_exists(public_path($existingMaterial->img)) && $existingMaterial->img !== $material['img']) {
+                            unlink(public_path($existingMaterial->img)); // Eliminar la imagen anterior
+                        }
+    
+                        // Si se envía una nueva imagen (archivo), guardarla
+                        if ($request->hasFile("materials_values.$index.img")) {
+                            $randomName = uniqid() . '_' . $request->file("materials_values.$index.img")->getClientOriginalName();
+                            $destinationPath = public_path('storage/products/materials/');
+                            $request->file("materials_values.$index.img")->move($destinationPath, $randomName);
+                            $materialImgPath = 'storage/products/materials/' . $randomName;
+                        }
+                    }
+    
+                    // Si no hay imagen nueva pero se pasa null, se puede borrar la imagen
+                    if (isset($material['img']) && $material['img'] === null) {
+                        // Eliminar la imagen si se pasa null
+                        if ($existingMaterial && $existingMaterial->img && file_exists(public_path($existingMaterial->img))) {
+                            unlink(public_path($existingMaterial->img)); // Eliminar la imagen existente
+                        }
+                    }
+    
+                    // Crear o actualizar la relación con la nueva imagen
+                    ProductMaterial::updateOrCreate(
+                        ['id_product' => $product->id, 'id_material' => $material['id_material_value']],
+                        ['img' => $materialImgPath]
+                    );
+                }
+            }
 
             // Actualizar atributos asociados
             if ($request->has('attributes_values')) {
+                // Obtener los ids de los atributos existentes en el producto
+                $existingAttributeValues = ProductAttribute::where('id_product', $product->id)
+                    ->pluck('id_attribute_value')->toArray();
+
+                // Obtener los ids de los atributos que vienen en la solicitud
+                $sentAttributeValues = array_column($request->attributes_values, 'id_attribute_value');
+
+                // Eliminar atributos cuyo id no está presente en la lista enviada
+                $idsToDelete = array_diff($existingAttributeValues, $sentAttributeValues);
+
+                foreach ($idsToDelete as $id) {
+                    // Buscar la relación y eliminarla
+                    $attributeInstance = ProductAttribute::where('id_product', $product->id)
+                        ->where('id_attribute_value', $id)
+                        ->first();
+
+                    if ($attributeInstance) {
+                        // Eliminar la imagen si existe
+                        if ($attributeInstance->img && file_exists(public_path($attributeInstance->img))) {
+                            unlink(public_path($attributeInstance->img));
+                        }
+
+                        // Eliminar el registro de la base de datos
+                        $attributeInstance->delete();
+                    }
+                }
+
+                // Ahora, procesamos los atributos enviados en la solicitud
                 foreach ($request->attributes_values as $index => $attribute) {
                     $attributeInstance = ProductAttribute::where('id_product', $product->id)
                         ->where('id_attribute_value', $attribute['id_attribute_value'])
@@ -520,25 +641,42 @@ class ProductController extends Controller
 
                     if (isset($attribute['img']) && is_string($attribute['img'])) {
                         // Conserva la imagen actual si es un string
-                        $attributeImgPath = $attributeInstance->img;
+                        $attributeImgPath = $attributeInstance ? $attributeInstance->img : null;
                     } elseif (isset($attribute['img']) && $attribute['img'] === null) {
                         // Elimina la imagen actual si se pasa null
-                        if ($attributeInstance && $attributeInstance->img && Storage::disk('public')->exists($attributeInstance->img)) {
-                            Storage::disk('public')->delete($attributeInstance->img);
+                        if ($attributeInstance && $attributeInstance->img && file_exists(public_path($attributeInstance->img))) {
+                            unlink(public_path($attributeInstance->img));
                         }
                         $attributeImgPath = null;
                     } elseif ($request->hasFile("attributes_values.$index.img")) {
                         // Actualiza con la nueva imagen si hay un archivo
-                        if ($attributeInstance && $attributeInstance->img && Storage::disk('public')->exists($attributeInstance->img)) {
-                            Storage::disk('public')->delete($attributeInstance->img);
+                        if ($attributeInstance && $attributeInstance->img && file_exists(public_path($attributeInstance->img))) {
+                            unlink(public_path($attributeInstance->img));
                         }
-                        $attributeImgPath = $request->file("attributes_values.$index.img")->store('products/attributes', 'public');
+                        $randomName = uniqid() . '_' . $request->file("attributes_values.$index.img")->getClientOriginalName();
+                        $destinationPath = public_path('storage/products/attributes/');
+                        $request->file("attributes_values.$index.img")->move($destinationPath, $randomName);
+                        $attributeImgPath = 'storage/products/attributes/' . $randomName;
                     }
 
+                    // Actualiza o crea la relación con la nueva imagen
                     ProductAttribute::updateOrCreate(
                         ['id_product' => $product->id, 'id_attribute_value' => $attribute['id_attribute_value']],
                         ['img' => $attributeImgPath]
                     );
+                }
+            } else {
+                // Si no se envían attributes_values, eliminamos todos los atributos relacionados al producto
+                $existingAttributes = ProductAttribute::where('id_product', $product->id)->get();
+            
+                foreach ($existingAttributes as $attributeInstance) {
+                    // Eliminar la imagen si existe
+                    if ($attributeInstance->img && file_exists(public_path($attributeInstance->img))) {
+                        unlink(public_path($attributeInstance->img));
+                    }
+            
+                    // Eliminar el atributo
+                    $attributeInstance->delete();
                 }
             }
 
@@ -579,6 +717,65 @@ class ProductController extends Controller
             return ApiResponse::create('Error al actualizar producto', 500, ['error' => $e->getMessage()]);
         }
     }
+
+    public function destroy($id)
+    {
+        try {
+            $product = Product::findOrFail($id);
+
+            // Eliminar la imagen principal si existe
+            if ($product->main_img && file_exists(public_path($product->main_img))) {
+                unlink(public_path($product->main_img));
+            }
+
+            // Eliminar el video principal si existe
+            if ($product->main_video && file_exists(public_path($product->main_video))) {
+                unlink(public_path($product->main_video));
+            }
+
+            // Eliminar el archivo de la ficha técnica si existe
+            if ($product->file_data_sheet && file_exists(public_path($product->file_data_sheet))) {
+                unlink(public_path($product->file_data_sheet));
+            }
+
+            // Eliminar las imágenes de la galería
+            foreach ($product->gallery as $galleryItem) {
+                if (file_exists(public_path($galleryItem->file))) {
+                    unlink(public_path($galleryItem->file));
+                }
+                $galleryItem->delete(); // Eliminar el registro en la base de datos
+            }
+
+            $product->attributes->each(function ($attribute) {
+                unlink(public_path($attribute->pivot->img));
+            });
+
+            $product->materials->each(function ($material) {
+                unlink(public_path($material->pivot->img));
+            });
+
+            // Eliminar las relaciones de categorías
+            $product->categories()->detach();
+
+            // Eliminar las relaciones de materiales
+            $product->materials()->detach();
+
+            // Eliminar las relaciones de componentes
+            $product->components()->detach();
+
+            // Eliminar las relaciones de atributos
+            $product->attributes()->detach();
+
+            // Eliminar el producto de la base de datos
+            $product->delete();
+
+            return ApiResponse::create('Producto eliminado correctamente.', 200);
+        } catch (Exception $e) {
+            Log::error($e->getMessage());
+            return ApiResponse::create('An error occurred while deleting the product.', 500);
+        }
+    }
+
 
     private function buildTree($items)
     {

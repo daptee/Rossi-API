@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Responses\ApiResponse;
+use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
@@ -19,7 +20,10 @@ class ProductsCategoriesController extends Controller
                 ->whereNull('id_category')
                 ->get()
                 ->map(function ($category) {
-                    return $this->removeEmptyCategories($category);
+                    // Procesa la categoría y su grid
+                    $category = $this->removeEmptyCategories($category);
+                    $category = $this->attachProductInfoToGrid($category);
+                    return $category;
                 });
 
             return ApiResponse::create('Succeeded', 200, $categories);
@@ -107,6 +111,24 @@ class ProductsCategoriesController extends Controller
 
             $category->save();
             $category->load('status');
+
+            $category->grid = array_map(function ($item) {
+                if ($item['props']['type'] === 'Producto' && isset($item['props']['id'])) {
+                    $product = Product::find($item['props']['id']);
+                    if ($product) {
+                        $item['props']['product_info'] = [
+                            'id' => $product->id,
+                            'name' => $product->name,
+                            'sku' => $product->sku,
+                            'description' => $product->description,
+                            'main_img' => $product->main_img,
+                            'featured' => $product->featured
+                            // Agrega otros campos que deseas mostrar
+                        ];
+                    }
+                }
+                return $item;
+            }, $category->grid);
 
             return ApiResponse::create('Categoría creada correctamente', 200, $category);
         } catch (Exception $e) {
@@ -261,4 +283,41 @@ class ProductsCategoriesController extends Controller
 
         return $category;
     }
+
+    private function attachProductInfoToGrid($category)
+    {
+        // Procesar el grid de la categoría principal
+        $category->grid = $this->processGrid($category->grid);
+
+        // Recursivamente procesar el grid de las subcategorías
+        if ($category->categories) {
+            foreach ($category->categories as $subCategory) {
+                $this->attachProductInfoToGrid($subCategory);
+            }
+        }
+
+        return $category;
+    }
+
+    private function processGrid($grid)
+    {
+        // Decodificar el grid en un array si está en formato JSON
+        $gridArray = is_string($grid) ? json_decode($grid, true) : $grid;
+
+        if (is_array($gridArray)) {
+            foreach ($gridArray as &$gridItem) {
+                if (isset($gridItem['props']['type']) && $gridItem['props']['type'] === 'Producto') {
+                    $productId = $gridItem['props']['id'];
+                    $product = Product::find($productId); // Obtener la información del producto
+
+                    if ($product) {
+                        $gridItem['props']['product_info'] = $product; // Agregar información del producto
+                    }
+                }
+            }
+        }
+
+        return $gridArray;
+    }
+
 }
