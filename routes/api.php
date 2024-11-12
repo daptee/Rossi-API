@@ -64,6 +64,7 @@ Route::group([
     Route::get('/{id}', [ProductController::class, 'indexProduct']);
     Route::post('/', [ProductController::class, 'store'])->middleware('admin');
     Route::post('/{id}', [ProductController::class, 'update'])->middleware('admin');
+    Route::delete('/{id}', [ProductController::class, 'destroy'])->middleware('admin');
 });
 
 // Rutas de distribuidores
