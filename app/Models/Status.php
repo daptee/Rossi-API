@@ -17,8 +17,8 @@ class Status extends Model
 
     public $timestamps = false;
 
-    public function productsCategories()
+    public function Category()
     {
-        return $this->hasMany(ProductsCategories::class, 'status', 'id');
+        return $this->hasMany(Category::class, 'status', 'id');
     }
 }

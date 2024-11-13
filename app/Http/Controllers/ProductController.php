@@ -42,8 +42,8 @@ class ProductController extends Controller
             if ($category_id) {
                 $query->whereHas('categories', function ($query) use ($category_id) {
                     // Filtramos por el id de categoría
-                    $query->where('products_categories.id', $category_id)
-                        ->orWhere('products_categories.id_category', $category_id);  // También incluye las subcategorías (padres)
+                    $query->where('categories.id', $category_id)
+                        ->orWhere('categories.id_category', $category_id);  // También incluye las subcategorías (padres)
                 });
             }
 
@@ -200,7 +200,7 @@ class ProductController extends Controller
                 'file_data_sheet' => 'nullable|file|mimes:pdf|max:5120',
                 'featured' => 'nullable|boolean',
                 'categories' => 'array',
-                'categories.*' => 'integer|exists:products_categories,id',
+                'categories.*' => 'integer|exists:categories,id',
                 'gallery' => 'array',
                 'gallery.*' => 'file|mimes:jpg,jpeg,png,mp4,mov,avi|max:10240',
                 'materials_values' => 'array',
@@ -362,7 +362,7 @@ class ProductController extends Controller
                 'file_data_sheet' => 'nullable',
                 'featured' => 'nullable|boolean',
                 'categories' => 'array',
-                'categories.*' => 'integer|exists:products_categories,id',
+                'categories.*' => 'integer|exists:categories,id',
                 'gallery' => 'array',
                 'gallery.*.id' => 'sometimes|exists:product_galleries,id',
                 'gallery.*.file' => 'nullable',
