@@ -2,7 +2,7 @@ USE u290214683_rossi;
 
 SET FOREIGN_KEY_CHECKS = 0;
 
-DROP TABLE IF EXISTS categories, products_categories;
+DROP TABLE IF EXISTS categories;
 
 SET FOREIGN_KEY_CHECKS = 1;
 
