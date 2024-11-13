@@ -8,21 +8,29 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use Exception;
-use App\Models\ProductsCategories;
+use App\Models\Category;
 
-class ProductsCategoriesController extends Controller
+class CategoriesController extends Controller
 {
     // GET ALL
     public function index()
     {
         try {
-            $categories = ProductsCategories::with('categories', 'status')
+            $categories = Category::with(['categories', 'status'])
+                ->withCount('products')
                 ->whereNull('id_category')
                 ->get()
                 ->map(function ($category) {
                     // Procesa la categoría y su grid
                     $category = $this->removeEmptyCategories($category);
                     $category = $this->attachProductInfoToGrid($category);
+
+                    // Asigna el conteo de productos a cada subcategoría
+                    $category->categories = $category->categories->map(function ($subCategory) {
+                        $subCategory->product_count = $subCategory->products->count();
+                        return $subCategory;
+                    });
+
                     return $category;
                 });
 
@@ -31,6 +39,7 @@ class ProductsCategoriesController extends Controller
             return ApiResponse::create('Error al traer todas las categorías', 500, ['error' => $e->getMessage()]);
         }
     }
+
 
     // POST
     public function store(Request $request)
@@ -44,7 +53,7 @@ class ProductsCategoriesController extends Controller
                 'color' => 'nullable|string',
                 'status' => 'required|integer|exists:status,id',
                 'grid' => 'nullable|json',
-                'id_category' => 'nullable|exists:products_categories,id',
+                'id_category' => 'nullable|exists:categories,id',
             ]);
 
             if ($validator->fails()) {
@@ -98,7 +107,7 @@ class ProductsCategoriesController extends Controller
             }
 
             // Guardar la categoría en la base de datos
-            $category = new ProductsCategories([
+            $category = new Category([
                 'id_category' => $request->input('id_category'),
                 'category' => $request->input('category'),
                 'img' => $imgPath,
@@ -112,23 +121,26 @@ class ProductsCategoriesController extends Controller
             $category->save();
             $category->load('status');
 
-            $category->grid = array_map(function ($item) {
-                if ($item['props']['type'] === 'Producto' && isset($item['props']['id'])) {
-                    $product = Product::find($item['props']['id']);
-                    if ($product) {
-                        $item['props']['product_info'] = [
-                            'id' => $product->id,
-                            'name' => $product->name,
-                            'sku' => $product->sku,
-                            'description' => $product->description,
-                            'main_img' => $product->main_img,
-                            'featured' => $product->featured
-                            // Agrega otros campos que deseas mostrar
-                        ];
+            if ($category->grid != null) {
+
+                $category->grid = array_map(function ($item) {
+                    if ($item['props']['type'] === 'Producto' && isset($item['props']['id'])) {
+                        $product = Product::find($item['props']['id']);
+                        if ($product) {
+                            $item['props']['product_info'] = [
+                                'id' => $product->id,
+                                'name' => $product->name,
+                                'sku' => $product->sku,
+                                'description' => $product->description,
+                                'main_img' => $product->main_img,
+                                'featured' => $product->featured
+                                // Agrega otros campos que deseas mostrar
+                            ];
+                        }
                     }
-                }
-                return $item;
-            }, $category->grid);
+                    return $item;
+                }, $category->grid);
+            }
 
             return ApiResponse::create('Categoría creada correctamente', 200, $category);
         } catch (Exception $e) {
@@ -147,15 +159,15 @@ class ProductsCategoriesController extends Controller
                 'icon' => 'nullable',
                 'color' => 'nullable|string',
                 'status' => 'required|integer|exists:status,id',
-                'grid' => 'required|json',
-                'id_category' => 'nullable|exists:products_categories,id',
+                'grid' => 'nullable|json',
+                'id_category' => 'nullable|exists:categories,id',
             ]);
 
             if ($validator->fails()) {
                 return ApiResponse::create('Validation failed', 422, $validator->errors());
             }
 
-            $category = ProductsCategories::findOrFail($id);
+            $category = Category::findOrFail($id);
 
             $imgPath = $this->processField($request, 'img', $category->img, public_path('storage/categories/images/'));
             $videoPath = $this->processField($request, 'video', $category->video, public_path('storage/categories/videos/'));
@@ -166,29 +178,31 @@ class ProductsCategoriesController extends Controller
             $newGridData = is_string($request->grid) ? json_decode($request->grid, true) : $request->grid;
 
             // Procesar archivos en la nueva `grid`
-            foreach ($newGridData as $key => &$newGridItem) {
-                $fileField = 'file_' . ($key + 1);
-
-                // Obtener el archivo actual de la `grid` guardada si existe
-                $existingGridItem = $existingGridData[$key] ?? null;
-                $existingFileUrl = $existingGridItem['props']['file']['url'] ?? null;
-
-                if ($request->hasFile($fileField)) {
-                    // Si hay un archivo nuevo, elimina el archivo existente si es diferente
-                    if ($existingFileUrl && $existingFileUrl !== $newGridItem['props']['file']['url']) {
+            if ($newGridData != null) {
+                foreach ($newGridData as $key => &$newGridItem) {
+                    $fileField = 'file_' . ($key + 1);
+    
+                    // Obtener el archivo actual de la `grid` guardada si existe
+                    $existingGridItem = $existingGridData[$key] ?? null;
+                    $existingFileUrl = $existingGridItem['props']['file']['url'] ?? null;
+    
+                    if ($request->hasFile($fileField)) {
+                        // Si hay un archivo nuevo, elimina el archivo existente si es diferente
+                        if ($existingFileUrl && $existingFileUrl !== $newGridItem['props']['file']['url']) {
+                            $this->deleteFile($existingFileUrl);
+                        }
+    
+                        // Guardar el nuevo archivo
+                        $fileName = time() . '_' . $request->file($fileField)->getClientOriginalName();
+                        $request->file($fileField)->move(public_path('storage/categories/grid/'), $fileName);
+    
+                        // Actualizar la URL del archivo en la nueva `grid`
+                        $newGridItem['props']['file']['url'] = 'storage/categories/grid/' . $fileName;
+                    } elseif ($existingFileUrl && !isset($newGridItem['props']['file']['url'])) {
+                        // Si no se envía un archivo nuevo pero había uno antiguo, eliminar el archivo antiguo
                         $this->deleteFile($existingFileUrl);
+                        $newGridItem['props']['file']['url'] = null;
                     }
-
-                    // Guardar el nuevo archivo
-                    $fileName = time() . '_' . $request->file($fileField)->getClientOriginalName();
-                    $request->file($fileField)->move(public_path('storage/categories/grid/'), $fileName);
-
-                    // Actualizar la URL del archivo en la nueva `grid`
-                    $newGridItem['props']['file']['url'] = 'storage/categories/grid/' . $fileName;
-                } elseif ($existingFileUrl && !isset($newGridItem['props']['file']['url'])) {
-                    // Si no se envía un archivo nuevo pero había uno antiguo, eliminar el archivo antiguo
-                    $this->deleteFile($existingFileUrl);
-                    $newGridItem['props']['file']['url'] = null;
                 }
             }
 

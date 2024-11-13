@@ -51,7 +51,7 @@ CREATE TABLE product_categories (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (id_product) REFERENCES products(id) ON DELETE CASCADE,
-    FOREIGN KEY (id_categorie) REFERENCES products_categories(id) ON DELETE CASCADE
+    FOREIGN KEY (id_categorie) REFERENCES categories(id) ON DELETE CASCADE
 );
 
 -- Tabla de materiales de productos
