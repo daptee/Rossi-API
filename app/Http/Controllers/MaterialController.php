@@ -8,6 +8,7 @@ use App\Models\Material;
 use App\Models\MaterialValue;
 use Illuminate\Support\Facades\Validator;
 use Exception;
+use Illuminate\Support\Facades\Log;
 
 class MaterialController extends Controller
 {
@@ -275,29 +276,41 @@ class MaterialController extends Controller
 
             // Eliminar físicamente las imágenes asociadas a los values del material principal
             foreach ($material->values as $value) {
-                $this->deleteFile($value->img); // Eliminar imagen física
-                $value->delete(); // Marca el value como eliminado (soft delete)
+                try {
+                    $this->deleteFile($value->img); // Eliminar imagen física
+                    $value->delete(); // Marca el value como eliminado (soft delete)
+                } catch (Exception $e) {
+                    Log::error("Error al eliminar el value del material con ID {$value->id}: " . $e->getMessage());
+                }
             }
 
             // Eliminar físicamente las imágenes de los submateriales y sus values
             foreach ($material->submaterials as $submaterial) {
-                // Eliminar cada value del submaterial
                 foreach ($submaterial->values as $subValue) {
-                    $this->deleteFile($subValue->img); // Eliminar imagen física
-                    $subValue->delete(); // Marca el value del submaterial como eliminado (soft delete)
+                    try {
+                        $this->deleteFile($subValue->img); // Eliminar imagen física
+                        $subValue->delete(); // Marca el value del submaterial como eliminado (soft delete)
+                    } catch (Exception $e) {
+                        Log::error("Error al eliminar el value del submaterial con ID {$subValue->id}: " . $e->getMessage());
+                    }
                 }
-                $submaterial->delete(); // Marca el submaterial como eliminado (soft delete)
+
+                try {
+                    $submaterial->delete(); // Marca el submaterial como eliminado (soft delete)
+                } catch (Exception $e) {
+                    Log::error("Error al eliminar el submaterial con ID {$submaterial->id}: " . $e->getMessage());
+                }
             }
 
             // Eliminar el material principal (soft delete)
             $material->delete();
 
-            return ApiResponse::create('Material eliminados correctamente.', 200);
+            return ApiResponse::create('Material y submateriales eliminados correctamente.', 200);
         } catch (Exception $e) {
-            return ApiResponse::create('Error al eliminar el material', 500, ['error' => $e->getMessage()]);
+            Log::error("Error al eliminar el material principal con ID {$id}: " . $e->getMessage());
+            return ApiResponse::create('Error al eliminar el material principal', 500, ['error' => $e->getMessage()]);
         }
     }
-
 
     /**
      * Procesar la imagen que puede ser un archivo o un string.
