@@ -1,6 +1,7 @@
 <?php
  
  use App\Http\Controllers\AttributeController;
+ use App\Http\Controllers\CategoriesController;
  use App\Http\Controllers\ComponentController;
  use App\Http\Controllers\DistributorController;
  use App\Http\Controllers\ProductController;
@@ -8,7 +9,6 @@
  use App\Http\Controllers\WebContentHomeController;
  use Illuminate\Support\Facades\Route;
  use App\Http\Controllers\AuthController;
- use App\Http\Controllers\ProductsCategoriesController;
  use App\Http\Controllers\MaterialController;
  
  // Rutas de autenticación
@@ -24,9 +24,9 @@ Route::group([
     'middleware' => 'api',
     'prefix' => 'categories'
 ], function () {
-    Route::get('/', [ProductsCategoriesController::class, 'index']);
-    Route::post('/', [ProductsCategoriesController::class, 'store'])->middleware('admin');
-    Route::post('/{id}', [ProductsCategoriesController::class, 'update'])->middleware('admin');
+    Route::get('/', [CategoriesController::class, 'index']);
+    Route::post('/', [CategoriesController::class, 'store'])->middleware('admin');
+    Route::post('/{id}', [CategoriesController::class, 'update'])->middleware('admin');
 });
 
 // Rutas de materiales
@@ -64,6 +64,7 @@ Route::group([
     Route::get('/{id}', [ProductController::class, 'indexProduct']);
     Route::post('/', [ProductController::class, 'store'])->middleware('admin');
     Route::post('/{id}', [ProductController::class, 'update'])->middleware('admin');
+    Route::delete('/{id}', [ProductController::class, 'destroy'])->middleware('admin');
 });
 
 // Rutas de distribuidores

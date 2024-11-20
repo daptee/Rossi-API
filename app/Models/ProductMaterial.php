@@ -13,6 +13,7 @@ class ProductMaterial extends Model
     protected $fillable = [
         'id_product',
         'id_material',
+        'img'
     ];
 
     public function product()

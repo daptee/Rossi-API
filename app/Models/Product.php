@@ -14,6 +14,9 @@ class Product extends Model
         'sku',
         'slug',
         'description',
+        'description_bold',
+        'description_italic',
+        'description_underline',
         'status',
         'main_img',
         'main_video',
@@ -30,12 +33,13 @@ class Product extends Model
 
     public function categories()
     {
-        return $this->belongsToMany(ProductsCategories::class, 'product_categories', 'id_product', 'id_categorie');
+        return $this->belongsToMany(Category::class, 'product_categories', 'id_product', 'id_categorie');
     }
 
     public function materials()
     {
         return $this->belongsToMany(MaterialValue::class, 'product_materials', 'id_product', 'id_material')
+            ->withPivot('img')
             ->with('material'); // Esto carga la relación con el modelo Material
     }
 

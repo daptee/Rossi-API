@@ -5,11 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class ProductsCategories extends Model
+class Category extends Model
 {
     use HasFactory;
 
-    protected $table = 'products_categories';
+    protected $table = 'categories';
 
     protected $fillable = [
         'id_category',
@@ -18,21 +18,32 @@ class ProductsCategories extends Model
         'video',
         'icon',
         'color',
-        'status'
+        'status',
+        'grid'
+    ];
+
+    protected $casts = [
+        'grid' => 'array',
     ];
 
     public function parent()
     {
-        return $this->belongsTo(ProductsCategories::class, 'id_category');
+        return $this->belongsTo(Category::class, 'id_category');
     }
 
     public function categories()
     {
-        return $this->hasMany(ProductsCategories::class, 'id_category')->with('categories', 'status');
+        return $this->hasMany(Category::class, 'id_category')->with('categories', 'status');
     }
 
     public function status()
     {
         return $this->belongsTo(Status::class, 'status', 'id');
     }
+
+    public function products()
+    {
+        return $this->hasMany(ProductCategory::class, 'id_categorie');
+    }
+
 }
