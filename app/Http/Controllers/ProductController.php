@@ -104,25 +104,70 @@ class ProductController extends Controller
 
     // GET ALL (para web)
     public function indexWeb(Request $request)
-    {
-        try {
-            $featured = $request->query('featured');
+{
+    try {
+        $featured = $request->query('featured');
 
-            $query = Product::where('status', 2)
-                ->select('id', 'name', 'slug', 'main_img', 'featured');
+        // Consulta los productos con todas las relaciones necesarias
+        $query = Product::with([
+            'categories',
+            'materials.material',
+            'attributes.attribute',
+            'gallery',
+            'components'
+        ])
+            ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'main_video', 'file_data_sheet', 'status', 'featured')
+            ->where('status', 2);
 
-            if ($featured !== null) {
-                $query->where('featured', $featured);
-            }
-
-            $products = $query->get();
-
-            return ApiResponse::create('Succeeded', 200, $products);
-        } catch (Exception $e) {
-            return ApiResponse::create('Error al obtener los productos', 500, ['error' => $e->getMessage()]);
+        if ($featured !== null) {
+            $query->where('featured', $featured);
         }
-    }
 
+        $products = $query->get();
+
+        // Limpia los datos del pivot para cada relación
+        $products->each(function ($product) {
+            $product->categories->each(function ($category) {
+                unset($category->pivot);
+            });
+
+            $product->materials->each(function ($material) {
+                $material->img_value = $material->pivot->img;
+                unset($material->pivot);
+            });
+
+            $product->attributes->each(function ($attribute) {
+                $attribute->img = $attribute->pivot->img;
+                unset($attribute->pivot);
+            });
+
+            $product->components->each(function ($component) {
+                unset($component->pivot);
+            });
+
+            // Obtener el nombre del estado del producto desde la tabla product_status
+            $status = ProductStatus::find($product->status);
+
+            // Si se encuentra el estado, agrega su nombre al producto
+            if ($status) {
+                $product->status = [
+                    'id' => $status->id,
+                    'status_name' => $status->status_name
+                ];
+            } else {
+                // Si no se encuentra el estado, define un valor por defecto
+                $product->status = [
+                    'id' => $product->status,
+                    'status_name' => 'Unknown'
+                ];
+            }
+        });
+
+        return ApiResponse::create('Succeeded', 200, $products);
+    } catch (Exception $e) {
+        return ApiResponse::create('Error al obtener los productos', 500, ['error' => $e->getMessage()]);
+    }
+}
 
     // GET PRODUCT
     public function indexProduct($id)
@@ -138,6 +183,64 @@ class ProductController extends Controller
             ])
                 ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'main_video', 'file_data_sheet', 'status', 'featured')
                 ->findOrFail($id);
+
+            // Limpia los datos del pivot para cada relación
+            $product->categories->each(function ($category) {
+                unset($category->pivot);
+            });
+
+            $product->materials->each(function ($material) {
+                $material->img_value = $material->pivot->img;
+                unset($material->pivot);
+            });
+
+            $product->attributes->each(function ($attribute) {
+                $attribute->img = $attribute->pivot->img;
+                unset($attribute->pivot);
+            });
+
+            $product->components->each(function ($component) {
+                unset($component->pivot);
+            });
+
+            // Obtener el nombre del estado del producto desde la tabla product_status
+            $status = ProductStatus::find($product->status);
+
+            // Si se encuentra el estado, agrega su nombre al producto
+            if ($status) {
+                $product->status = [
+                    'id' => $status->id,
+                    'status_name' => $status->status_name
+                ];
+            } else {
+                // Si no se encuentra el estado, puedes definir un valor por defecto o manejar el error
+                $product->status = [
+                    'id' => $product->status,
+                    'status_name' => 'Unknown' // O cualquier valor por defecto
+                ];
+            }
+
+            return ApiResponse::create('Succeeded', 200, $product);
+        } catch (Exception $e) {
+            return ApiResponse::create('Error al obtener el producto', 500, ['error' => $e->getMessage()]);
+        }
+    }
+
+    public function skuProduct($sku)
+    {
+        try {
+            Log::info($sku);
+            // Consulta el producto con todas las relaciones necesarias
+            $product = Product::with([
+                'categories',
+                'materials.material',
+                'attributes.attribute',
+                'gallery',
+                'components'
+            ])
+                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'main_video', 'file_data_sheet', 'status', 'featured')
+                ->where('sku', $sku)
+                ->firstOrFail();
 
             // Limpia los datos del pivot para cada relación
             $product->categories->each(function ($category) {
