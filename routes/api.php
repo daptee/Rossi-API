@@ -62,6 +62,7 @@ Route::group([
     Route::get('/admin', [ProductController::class, 'indexAdmin'])->middleware('admin');
     Route::get('/', [ProductController::class, 'indexWeb']);
     Route::get('/{id}', [ProductController::class, 'indexProduct']);
+    Route::get('/sku/{sku}', [ProductController::class, 'skuProduct']);
     Route::post('/', [ProductController::class, 'store'])->middleware('admin');
     Route::post('/{id}', [ProductController::class, 'update'])->middleware('admin');
     Route::delete('/{id}', [ProductController::class, 'destroy'])->middleware('admin');
