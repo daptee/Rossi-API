@@ -226,6 +226,64 @@ class ProductController extends Controller
         }
     }
 
+    public function skuProduct($sku)
+    {
+        try {
+            Log::info($sku);
+            // Consulta el producto con todas las relaciones necesarias
+            $product = Product::with([
+                'categories',
+                'materials.material',
+                'attributes.attribute',
+                'gallery',
+                'components'
+            ])
+                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'main_video', 'file_data_sheet', 'status', 'featured')
+                ->where('sku', $sku)
+                ->firstOrFail();
+
+            // Limpia los datos del pivot para cada relación
+            $product->categories->each(function ($category) {
+                unset($category->pivot);
+            });
+
+            $product->materials->each(function ($material) {
+                $material->img_value = $material->pivot->img;
+                unset($material->pivot);
+            });
+
+            $product->attributes->each(function ($attribute) {
+                $attribute->img = $attribute->pivot->img;
+                unset($attribute->pivot);
+            });
+
+            $product->components->each(function ($component) {
+                unset($component->pivot);
+            });
+
+            // Obtener el nombre del estado del producto desde la tabla product_status
+            $status = ProductStatus::find($product->status);
+
+            // Si se encuentra el estado, agrega su nombre al producto
+            if ($status) {
+                $product->status = [
+                    'id' => $status->id,
+                    'status_name' => $status->status_name
+                ];
+            } else {
+                // Si no se encuentra el estado, puedes definir un valor por defecto o manejar el error
+                $product->status = [
+                    'id' => $product->status,
+                    'status_name' => 'Unknown' // O cualquier valor por defecto
+                ];
+            }
+
+            return ApiResponse::create('Succeeded', 200, $product);
+        } catch (Exception $e) {
+            return ApiResponse::create('Error al obtener el producto', 500, ['error' => $e->getMessage()]);
+        }
+    }
+
     // POST - Crear un nuevo producto
     public function store(Request $request)
     {
