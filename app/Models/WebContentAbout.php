@@ -7,13 +7,19 @@ use Illuminate\Database\Eloquent\Model;
 
 class WebContentAbout extends Model
 {
-    protected $table = 'web_content_about';
-    
     use HasFactory;
 
-    protected $fillable = ['id_user', 'data'];
+    protected $table = 'web_content_about';
+
+    protected $fillable = ['id_user', 'data', 'video_giro', 'video_showroom'];
 
     protected $casts = [
         'data' => 'array',
     ];
+
+    // Relación con la galería
+    public function gallery()
+    {
+        return $this->hasMany(GalleryWebContentAbout::class, 'id_web_content_about');
+    }
 }

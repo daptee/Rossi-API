@@ -98,7 +98,7 @@ Route::group([
 ], function () {
     Route::get('/', [WebContentAboutController::class, 'index']);
     Route::post('/', [WebContentAboutController::class, 'store'])->middleware('admin');
-    Route::put('/{id}', [WebContentAboutController::class, 'update'])->middleware('admin');
+    Route::post('/{id}', [WebContentAboutController::class, 'update'])->middleware('admin');
 });
 
 // Rutas del componente
