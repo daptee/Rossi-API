@@ -12,13 +12,16 @@ class Distributor extends Model
     protected $fillable = [
         'name',
         'address',
-        'locality_id',
+        'number',
+        'locality_id',        
+        'locality',
         'postal_code',
         'web_url',
         'phone',
         'whatsapp',
         'email',
         'instagram',
+        'facebook'
     ];
 
     public function locality()
