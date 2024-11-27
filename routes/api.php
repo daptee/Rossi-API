@@ -87,7 +87,7 @@ Route::group([
 ], function () {
     Route::get('/', [WebContentHomeController::class, 'index']);
     Route::post('/', [WebContentHomeController::class, 'store'])->middleware('admin');
-    Route::put('/{id}', [WebContentHomeController::class, 'update'])->middleware('admin');
+    Route::post('/{id}', [WebContentHomeController::class, 'update'])->middleware('admin');
 });
 
 // Rutas del contenido sobre nosotros de la web
@@ -98,7 +98,7 @@ Route::group([
 ], function () {
     Route::get('/', [WebContentAboutController::class, 'index']);
     Route::post('/', [WebContentAboutController::class, 'store'])->middleware('admin');
-    Route::put('/{id}', [WebContentAboutController::class, 'update'])->middleware('admin');
+    Route::post('/{id}', [WebContentAboutController::class, 'update'])->middleware('admin');
 });
 
 // Rutas del componente
