@@ -31,13 +31,16 @@ class DistributorController extends Controller
             $validator = Validator::make($request->all(), [
                 'name' => 'required|string|max:150',
                 'address' => 'required|string|max:255',
+                'number' => 'required|string|max:10',
                 'locality_id' => 'required|integer|exists:localities,id',
+                'locality' => 'required|string|max:255',
                 'postal_code' => 'nullable|string|max:10',  // Si postal_code es opcional
                 'web_url' => 'nullable|url|max:255',
                 'phone' => 'nullable|string|max:20',
                 'whatsapp' => 'nullable|string|max:20',
                 'email' => 'nullable|email|max:100',
                 'instagram' => 'nullable|string|max:100',
+                'facebook' => 'nullable|string|max:100',
             ]);
 
             if ($validator->fails()) {
@@ -61,14 +64,17 @@ class DistributorController extends Controller
 
             $validator = Validator::make($request->all(), [
                 'name' => 'required|string|max:150',
+                'number' => 'required|string|max:10',
                 'address' => 'required|string|max:255',
                 'locality_id' => 'required|integer|exists:localities,id',
+                'locality' => 'nullable|string|max:255',
                 'postal_code' => 'nullable|string|max:10',
                 'web_url' => 'nullable|url|max:255',
                 'phone' => 'nullable|string|max:20',
                 'whatsapp' => 'nullable|string|max:20',
                 'email' => 'nullable|email|max:100',
                 'instagram' => 'nullable|string|max:100',
+                'facebook' => 'nullable|string|max:100',
             ]);
 
             if ($validator->fails()) {
