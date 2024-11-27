@@ -13,7 +13,9 @@ CREATE TABLE web_content_about (
 
 CREATE TABLE gallery_web_content_about (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    id_web_content_about BIGINT UNSIGNED NOT NULL,
     file VARCHAR(255),
+    CONSTRAINT fk_web_content_about FOREIGN KEY (id_web_content_about) REFERENCES web_content_about(id) ON DELETE CASCADE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
