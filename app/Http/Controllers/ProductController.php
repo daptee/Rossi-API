@@ -185,6 +185,7 @@ class ProductController extends Controller
     {
         try {
             Log::info($sku);
+
             // Consulta el producto con todas las relaciones necesarias
             $product = Product::with([
                 'categories',
@@ -219,19 +220,38 @@ class ProductController extends Controller
             // Obtener el nombre del estado del producto desde la tabla product_status
             $status = ProductStatus::find($product->status);
 
-            // Si se encuentra el estado, agrega su nombre al producto
             if ($status) {
                 $product->status = [
                     'id' => $status->id,
                     'status_name' => $status->status_name
                 ];
             } else {
-                // Si no se encuentra el estado, puedes definir un valor por defecto o manejar el error
                 $product->status = [
                     'id' => $product->status,
-                    'status_name' => 'Unknown' // O cualquier valor por defecto
+                    'status_name' => 'Unknown'
                 ];
             }
+
+            // Palabras a ignorar en la búsqueda
+            $ignoreWords = ['silla', 'mesa', 'escritorio'];
+
+            // Separar el nombre del producto principal en palabras y filtrar las ignoradas
+            $productNameWords = collect(explode(' ', $product->name))
+                ->reject(fn($word) => in_array(strtolower($word), $ignoreWords))
+                ->values();
+
+            // Buscar productos relacionados que contengan al menos una de las palabras clave
+            $relatedProducts = Product::select('id', 'name', 'slug', 'sku', 'main_img')
+                ->where(function ($query) use ($productNameWords) {
+                    foreach ($productNameWords as $word) {
+                        $query->orWhere('name', 'LIKE', '%' . $word . '%');
+                    }
+                })
+                ->where('id', '!=', $product->id) // Excluir el producto principal
+                ->get();
+
+            // Agregar los productos relacionados al array principal
+            $product->products = $relatedProducts;
 
             return ApiResponse::create('Succeeded', 200, $product);
         } catch (Exception $e) {
@@ -606,20 +626,20 @@ class ProductController extends Controller
             if (!$request->has('materials_values') || empty($request->materials_values)) {
                 // Si no se envían materiales, eliminar todos los materiales asociados al producto
                 $productMaterials = ProductMaterial::where('id_product', $product->id)->get();
-            
+
                 foreach ($productMaterials as $material) {
                     // Eliminar la imagen si existe
                     if ($material->img && file_exists(public_path($material->img))) {
                         unlink(public_path($material->img));
                     }
-            
+
                     // Eliminar el registro de la base de datos
                     $material->delete();
                 }
             } else {
                 // Crear un array de IDs de materiales enviados
                 $sentMaterialIds = collect($request->materials_values)->pluck('id_material_value')->all();
-            
+
                 // Eliminar materiales que ya no están en la solicitud
                 $existingMaterials = ProductMaterial::where('id_product', $product->id)->get();
                 foreach ($existingMaterials as $existingMaterial) {
@@ -632,15 +652,15 @@ class ProductController extends Controller
                         $existingMaterial->delete();
                     }
                 }
-            
+
                 // Procesar materiales enviados
                 foreach ($request->materials_values as $index => $material) {
                     $existingMaterial = ProductMaterial::where('id_product', $product->id)
                         ->where('id_material', $material['id_material_value'])
                         ->first();
-            
+
                     $materialImgPath = $existingMaterial ? $existingMaterial->img : null;
-            
+
                     // Verificar si el material ya existe
                     if ($existingMaterial) {
                         if ($request->hasFile("materials_values.$index.img")) {
@@ -648,13 +668,13 @@ class ProductController extends Controller
                             if ($existingMaterial->img && file_exists(public_path($existingMaterial->img))) {
                                 unlink(public_path($existingMaterial->img));
                             }
-            
+
                             // Guardar la nueva imagen
                             $randomName = uniqid() . '_' . $request->file("materials_values.$index.img")->getClientOriginalName();
                             $destinationPath = public_path('storage/products/materials/');
                             $request->file("materials_values.$index.img")->move($destinationPath, $randomName);
                             $materialImgPath = 'storage/products/materials/' . $randomName;
-            
+
                         } elseif (!isset($material['img'])) {
                             // Si 'img' no está definido, eliminar la imagen existente
                             if ($existingMaterial->img && file_exists(public_path($existingMaterial->img))) {
@@ -671,14 +691,14 @@ class ProductController extends Controller
                             $materialImgPath = 'storage/products/materials/' . $randomName;
                         }
                     }
-            
+
                     // Crear o actualizar la relación con la imagen actualizada o eliminada
                     ProductMaterial::updateOrCreate(
                         ['id_product' => $product->id, 'id_material' => $material['id_material_value']],
                         ['img' => $materialImgPath]
                     );
                 }
-            }                     
+            }
 
             // Actualizar atributos asociados
             if ($request->has('attributes_values')) {
