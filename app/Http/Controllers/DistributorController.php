@@ -16,7 +16,8 @@ class DistributorController extends Controller
     public function index()
     {
         try {
-            $distributors = Distributor::with(['locality.province'])->get();
+            $distributors = Distributor::where('status', 2)
+            -> with(['locality.province', 'status'])->get();
 
             return ApiResponse::create('Succeeded', 200, $distributors);
         } catch (Exception $e) {
@@ -41,6 +42,7 @@ class DistributorController extends Controller
                 'email' => 'nullable|email|max:100',
                 'instagram' => 'nullable|string|max:100',
                 'facebook' => 'nullable|string|max:100',
+                'status' => 'required|integer|exists:status,id',
             ]);
 
             if ($validator->fails()) {
@@ -48,7 +50,7 @@ class DistributorController extends Controller
             }
 
             $distributor = Distributor::create($request->all());
-            $distributor->load('locality.province');
+            $distributor->load('locality.province', 'status');
 
             return ApiResponse::create('Distribuitor creado con exito', 200, $distributor);
         } catch (Exception $e) {
@@ -75,6 +77,7 @@ class DistributorController extends Controller
                 'email' => 'nullable|email|max:100',
                 'instagram' => 'nullable|string|max:100',
                 'facebook' => 'nullable|string|max:100',
+                'status' => 'required|integer|exists:status,id',
             ]);
 
             if ($validator->fails()) {
@@ -84,7 +87,7 @@ class DistributorController extends Controller
             $distributor = Distributor::findOrFail($id);
             $distributor->update($request->all());
 
-            $distributor->load('locality.province');
+            $distributor->load('locality.province', 'status');
 
             return ApiResponse::create('Distribuidor actualizado con exito', 200, $distributor);
         } catch (Exception $e) {

@@ -21,12 +21,18 @@ class Distributor extends Model
         'whatsapp',
         'email',
         'instagram',
-        'facebook'
+        'facebook',
+        'status'
     ];
 
     public function locality()
     {
         return $this->belongsTo(Locality::class);
+    }
+
+    public function status()
+    {
+        return $this->belongsTo(Status::class, 'status', 'id');
     }
 }
 
