@@ -5,6 +5,7 @@
  use App\Http\Controllers\ComponentController;
  use App\Http\Controllers\DistributorController;
  use App\Http\Controllers\ProductController;
+ use App\Http\Controllers\ProvinceController;
  use App\Http\Controllers\WebContentAboutController;
  use App\Http\Controllers\WebContentHomeController;
  use Illuminate\Support\Facades\Route;
@@ -110,4 +111,13 @@ Route::group([
     Route::get('/', [ComponentController::class, 'index']);
     Route::post('/', [ComponentController::class, 'store'])->middleware('admin');
     Route::post('/{id}', [ComponentController::class, 'update'])->middleware('admin');
+});
+
+// Rutas provinces
+
+Route::group([
+    'middleware' => 'api',
+    'prefix' => 'provinces'
+], function () {
+    Route::get('/', [ProvinceController::class, 'index']);
 });
