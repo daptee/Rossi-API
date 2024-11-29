@@ -185,25 +185,25 @@ class WebContentAboutController extends Controller
             foreach ($request->gallery as $galleryItem) {
                 // Crear una nueva imagen si el ID es null y el archivo está presente
                 if (!isset($galleryItem['id']) && isset($galleryItem['file']) && $galleryItem['file']->isValid()) {
-                    $uploadedFile = $galleryItem['file'];
-                    $uniqueFileName = uniqid() . '_' . time() . '.' . $uploadedFile->getClientOriginalExtension();
-                    $galleryDirectory = public_path('storage/web_content_about/gallery');
-                    $uploadedFile->move($galleryDirectory, $uniqueFileName);
+    $uploadedFile = $galleryItem['file'];
+    $uniqueFileName = uniqid() . '_' . time() . '.' . $uploadedFile->getClientOriginalExtension();
+    $galleryDirectory = public_path('storage/web_content_about/gallery');
+    $uploadedFile->move($galleryDirectory, $uniqueFileName);
 
-                    $newFilePath = "storage/web_content_about/gallery/" . $uniqueFileName;
+    $newFilePath = "storage/web_content_about/gallery/" . $uniqueFileName;
 
-                    // Crear el nuevo registro en la base de datos
-                    $newImage = GalleryWebContentAbout::create([
-                        'web_content_about_id' => $webContent->id,
-                        'file' => $newFilePath,
-                    ]);
+    // Crear el nuevo registro en la base de datos
+    $newImage = GalleryWebContentAbout::create([
+        'id_web_content_about' => $webContent->id, // Asegúrate de que este campo sea el correcto
+        'file' => $newFilePath,
+    ]);
 
-                    // Actualizar el JSON
-                    $decodedData['gallery'][] = [
-                        'id' => $newImage->id,
-                        'file' => $newFilePath,
-                    ];
-                }
+    // Actualizar el JSON
+    $decodedData['gallery'][] = [
+        'id' => $newImage->id,
+        'file' => $newFilePath,
+    ];
+}
 
                 // Reemplazar una imagen existente si el ID está presente y el archivo es válido
                 if (isset($galleryItem['id']) && isset($galleryItem['file']) && $galleryItem['file']->isValid()) {
