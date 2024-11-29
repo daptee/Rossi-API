@@ -107,9 +107,9 @@ class WebContentAboutController extends Controller
                         ]);
 
                         // Actualizar el JSON `data` con la información de la imagen
-                        if (isset($decodedData['images']['files'][$index])) {
-                            $decodedData['images']['files'][$index]['file'] = $gallery->file;
-                            $decodedData['images']['files'][$index]['id'] = $gallery->id;
+                        if (isset($decodedData['gallery'][$index])) {
+                            $decodedData['gallery'][$index]['file'] = $gallery->file;
+                            $decodedData['gallery'][$index]['id'] = $gallery->id;
                         }
                     }
                 }
@@ -204,7 +204,7 @@ class WebContentAboutController extends Controller
                             $existingImage->update(['file' => $newFilePath]);
 
                             // Actualizar el JSON
-                            foreach ($decodedData['images']['files'] as &$file) {
+                            foreach ($decodedData['gallery'] as &$file) {
                                 if ($file['id'] == $galleryItem['id']) {
                                     $file['file'] = $newFilePath;
                                     break;
