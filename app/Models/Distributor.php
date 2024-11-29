@@ -15,6 +15,7 @@ class Distributor extends Model
         'number',
         'locality_id',        
         'locality',
+        'position',
         'postal_code',
         'web_url',
         'phone',
@@ -23,6 +24,10 @@ class Distributor extends Model
         'instagram',
         'facebook',
         'status'
+    ];
+
+    protected $casts = [
+        'position' => 'array',
     ];
 
     public function locality()
