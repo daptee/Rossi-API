@@ -22,41 +22,37 @@ class ProductController extends Controller
     public function indexAdmin(Request $request)
     {
         try {
-            $category_id = $request->query('category_id');  // Obtén el category_id de la solicitud
+            $category_id = $request->query('category_id');
+            $search = $request->query('search');
+            $perPage = $request->query('per_page', 30);
 
             // Consulta inicial
             $query = Product::select('products.id', 'products.name', 'products.main_img', 'products.status', 'products.featured', 'product_status.status_name', 'products.sku', 'products.slug', 'products.created_at')
                 ->join('product_status', 'products.status', '=', 'product_status.id')
-                ->with([
-                    'categories' => function ($query) {
-                        $query->with('parent'); // Incluimos la relación 'parent' en categorías
-                    },
-                    'materials',
-                    'attributes',
-                    'gallery',
-                    'components'
-                ])
+                ->with(['categories.parent', 'materials', 'attributes', 'gallery', 'components'])
                 ->withCount(['categories', 'materials', 'attributes', 'gallery', 'components']);
 
-            // Si se recibe un category_id, filtramos los productos por la categoría
             if ($category_id) {
                 $query->whereHas('categories', function ($query) use ($category_id) {
-                    // Filtramos por el id de categoría
                     $query->where('categories.id', $category_id)
-                        ->orWhere('categories.id_category', $category_id);  // También incluye las subcategorías (padres)
+                        ->orWhere('categories.id_category', $category_id);
                 });
             }
 
-            // Ejecutamos la consulta
-            $products = $query->get();
+            if ($search) {
+                $query->where(function ($query) use ($search) {
+                    $query->where('products.name', 'like', "%$search%")
+                        ->orWhere('products.sku', 'like', "%$search%");
+                });
+            }
 
-            // Mapea cada producto para devolver solo los conteos, la información básica y las categorías
-            $products = $products->map(function ($product) {
+            $products = $query->paginate($perPage);
+
+            $products->getCollection()->transform(function ($product) {
                 $categories = collect();
 
                 foreach ($product->categories as $category) {
-                    if ($category->id_category) { // Si es una categoría hija
-                        // Agregamos la categoría padre si aún no está en la colección
+                    if ($category->id_category) {
                         $parentCategory = $category->parent;
                         if ($parentCategory && !$categories->contains('id', $parentCategory->id)) {
                             $categories->push([
@@ -66,14 +62,12 @@ class ProductController extends Controller
                         }
                     }
 
-                    // Agregamos la categoría hija
                     $categories->push([
                         'id' => $category->id,
                         'category' => $category->category,
                     ]);
                 }
 
-                // Filtramos duplicados en caso de que se repita alguna categoría
                 $uniqueCategories = $categories->unique('id')->values();
 
                 return [
@@ -96,78 +90,121 @@ class ProductController extends Controller
                 ];
             });
 
-            return ApiResponse::create('Succeeded', 200, $products);
+            $metaData = [
+                'page' => $products->currentPage(),
+                'per_page' => $products->perPage(),
+                'total' => $products->total(),
+                'last_page' => $products->lastPage(),
+            ];
+
+            return ApiResponse::create('Productos obtenidos correctamente', 200, $products->items(), $metaData);
         } catch (Exception $e) {
-            return ApiResponse::create('Error al obtener los productos', 500, ['error' => $e->getMessage()]);
+            return ApiResponse::create('Error al obtener los productos', 500, [], ['error' => $e->getMessage()]);
         }
     }
 
     // GET ALL (para web)
     public function indexWeb(Request $request)
-{
-    try {
-        $featured = $request->query('featured');
+    {
+        try {
+            $featured = $request->query('featured');
+            $search = $request->query('search'); // Parámetro de búsqueda
+            $perPage = $request->query('per_page', 30); // Número de elementos por página, por defecto 30
 
-        // Consulta los productos con todas las relaciones necesarias
-        $query = Product::with([
-            'categories',
-            'materials.material',
-            'attributes.attribute',
-            'gallery',
-            'components'
-        ])
-            ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'main_video', 'file_data_sheet', 'status', 'featured')
-            ->where('status', 2);
+            // Consulta inicial con relaciones necesarias
+            $query = Product::with([
+                'categories',
+                'materials.material',
+                'attributes.attribute',
+                'gallery',
+                'components'
+            ])
+                ->select(
+                    'id', 
+                    'name', 
+                    'slug', 
+                    'sku', 
+                    'description', 
+                    'description_bold', 
+                    'description_italic', 
+                    'description_underline', 
+                    'main_img', 
+                    'main_video', 
+                    'file_data_sheet', 
+                    'status', 
+                    'featured'
+                )
+                ->where('status', 2); // Solo productos con estado 2
 
-        if ($featured !== null) {
-            $query->where('featured', $featured);
-        }
-
-        $products = $query->get();
-
-        // Limpia los datos del pivot para cada relación
-        $products->each(function ($product) {
-            $product->categories->each(function ($category) {
-                unset($category->pivot);
-            });
-
-            $product->materials->each(function ($material) {
-                $material->img_value = $material->pivot->img;
-                unset($material->pivot);
-            });
-
-            $product->attributes->each(function ($attribute) {
-                $attribute->img = $attribute->pivot->img;
-                unset($attribute->pivot);
-            });
-
-            $product->components->each(function ($component) {
-                unset($component->pivot);
-            });
-
-            // Obtener el nombre del estado del producto desde la tabla product_status
-            $status = ProductStatus::find($product->status);
-
-            // Si se encuentra el estado, agrega su nombre al producto
-            if ($status) {
-                $product->status = [
-                    'id' => $status->id,
-                    'status_name' => $status->status_name
-                ];
-            } else {
-                // Si no se encuentra el estado, define un valor por defecto
-                $product->status = [
-                    'id' => $product->status,
-                    'status_name' => 'Unknown'
-                ];
+            // Filtrar por featured si el parámetro está presente
+            if ($featured !== null) {
+                $query->where('featured', $featured);
             }
-        });
 
-        return ApiResponse::create('Succeeded', 200, $products);
-    } catch (Exception $e) {
-        return ApiResponse::create('Error al obtener los productos', 500, ['error' => $e->getMessage()]);
+            // Filtrar por búsqueda si el parámetro está presente
+            if ($search !== null) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', '%' . $search . '%') // Buscar en el nombre
+                    ->orWhere('slug', 'like', '%' . $search . '%') // Buscar en el slug
+                    ->orWhere('description', 'like', '%' . $search . '%'); // Buscar en la descripción
+                });
+            }
+
+            // Obtener los productos paginados
+            $products = $query->paginate($perPage);
+
+            // Limpiar datos del pivot y ajustar relaciones
+            $products->getCollection()->each(function ($product) {
+                $product->categories->each(function ($category) {
+                    unset($category->pivot);
+                });
+
+                $product->materials->each(function ($material) {
+                    $material->img_value = $material->pivot->img;
+                    unset($material->pivot);
+                });
+
+                $product->attributes->each(function ($attribute) {
+                    $attribute->img = $attribute->pivot->img;
+                    unset($attribute->pivot);
+                });
+
+                $product->components->each(function ($component) {
+                    unset($component->pivot);
+                });
+
+                // Obtener el nombre del estado del producto desde la tabla product_status
+                $status = ProductStatus::find($product->status);
+
+                // Agregar nombre del estado o establecer valor por defecto
+                if ($status) {
+                    $product->status = [
+                        'id' => $status->id,
+                        'status_name' => $status->status_name
+                    ];
+                } else {
+                    $product->status = [
+                        'id' => $product->status,
+                        'status_name' => 'Unknown'
+                    ];
+                }
+            });
+
+            // Metadata para paginación
+            $metaData = [
+                'page' => $products->currentPage(),
+                'per_page' => $products->perPage(),
+                'total' => $products->total(),
+                'last_page' => $products->lastPage(),
+            ];
+
+            // Respuesta con ApiResponse
+            return ApiResponse::create('Productos obtenidos correctamente', 200, $products->items(), $metaData);
+        } catch (Exception $e) {
+            return ApiResponse::create('Error al obtener los productos', 500, [], ['error' => $e->getMessage()]);
+        }
     }
-}
+
 
     // GET PRODUCT
     public function indexProduct($id)

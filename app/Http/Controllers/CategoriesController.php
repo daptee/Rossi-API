@@ -13,33 +13,60 @@ use App\Models\Category;
 class CategoriesController extends Controller
 {
     // GET ALL
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $categories = Category::with(['categories', 'status'])
+            $search = $request->query('search'); // Parámetro de búsqueda
+            $perPage = $request->query('per_page', 30); // Número de elementos por página, por defecto 30
+
+            // Consulta inicial con relaciones necesarias
+            $query = Category::with(['categories', 'status'])
                 ->withCount('products')
-                ->whereNull('id_category')
-                ->get()
-                ->map(function ($category) {
-                    // Procesa la categoría y su grid
-                    $category = $this->removeEmptyCategories($category);
-                    $category = $this->attachProductInfoToGrid($category);
+                ->whereNull('id_category');
 
-                    // Asigna el conteo de productos a cada subcategoría
-                    $category->categories = $category->categories->map(function ($subCategory) {
-                        $subCategory->product_count = $subCategory->products->count();
-                        return $subCategory;
-                    });
+            if ($search !== null) {
+                // Buscar en categorías principales o subcategorías
+                $query->where(function ($q) use ($search) {
+                    // Buscar en el nombre de las categorías principales
+                    $q->where('category', 'like', '%' . $search . '%')
+                        // O buscar en las subcategorías
+                        ->orWhereHas('categories', function ($subQuery) use ($search) {
+                            $subQuery->where('category', 'like', '%' . $search . '%');
+                        });
+                });
+            }
 
-                    return $category;
+            // Obtener las categorías paginadas
+            $categories = $query->paginate($perPage);
+
+            // Procesar cada categoría y sus subcategorías
+            $categories->getCollection()->transform(function ($category) {
+                $category = $this->removeEmptyCategories($category);
+                $category = $this->attachProductInfoToGrid($category);
+
+                // Asigna el conteo de productos a cada subcategoría
+                $category->categories = $category->categories->map(function ($subCategory) {
+                    $subCategory->product_count = $subCategory->products->count();
+                    return $subCategory;
                 });
 
-            return ApiResponse::create('Succeeded', 200, $categories);
+                return $category;
+            });
+
+            // Metadata para paginación
+            $metaData = [
+                'page' => $categories->currentPage(),
+                'per_page' => $categories->perPage(),
+                'total' => $categories->total(),
+                'last_page' => $categories->lastPage(),
+            ];
+
+            // Respuesta con ApiResponse
+            return ApiResponse::create('Categorías obtenidas correctamente', 200, $categories->items(), $metaData);
         } catch (Exception $e) {
-            return ApiResponse::create('Error al traer todas las categorías', 500, ['error' => $e->getMessage()]);
+            return ApiResponse::create('Error al traer todas las categorías', 500, [], ['error' => $e->getMessage()]);
         }
     }
-
 
     // POST
     public function store(Request $request)
