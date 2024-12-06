@@ -13,15 +13,43 @@ use Exception;
 class DistributorController extends Controller
 {
     // GET ALL (para admin)
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $distributors = Distributor::where('status', 2)
-                ->with(['locality.province', 'status'])->get();
+            $search = $request->query('search'); // Parámetro de búsqueda
+            $perPage = $request->query('per_page', 30); // Número de elementos por página, por defecto 30
 
-            return ApiResponse::create('Succeeded', 200, $distributors);
+            // Consulta inicial
+            $query = Distributor::where('status', 2)
+                ->with(['locality.province', 'status']);
+
+            // Filtrar por búsqueda si el parámetro está presente
+            if ($search !== null) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', '%' . $search . '%') // Buscar por nombre del distribuidor
+                    ->orWhereHas('locality', function ($subQuery) use ($search) {
+                        $subQuery->where('name', 'like', '%' . $search . '%') // Buscar por nombre de la localidad
+                                ->orWhereHas('province', function ($subSubQuery) use ($search) {
+                                    $subSubQuery->where('name', 'like', '%' . $search . '%'); // Buscar por nombre de la provincia
+                                });
+                    });
+                });
+            }
+
+            // Obtener distribuidores paginados
+            $distributors = $query->paginate($perPage);
+
+            // Metadatos para la paginación
+            $metaData = [
+                'page' => $distributors->currentPage(),
+                'per_page' => $distributors->perPage(),
+                'total' => $distributors->total(),
+                'last_page' => $distributors->lastPage(),
+            ];
+
+            return ApiResponse::create('Distribuidores obtenidos correctamente', 200, $distributors->items(), $metaData);
         } catch (Exception $e) {
-            return ApiResponse::create('Error al obtener los distribuidores', 500, ['error' => $e->getMessage()]);
+            return ApiResponse::create('Error al obtener los distribuidores', 500, [], ['error' => $e->getMessage()]);
         }
     }
 
