@@ -11,15 +11,37 @@ use Exception;
 
 class ComponentController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $components = Component::with('status')->get();
-            return ApiResponse::create('Succeeded', 200, $components);
+            $search = $request->query('search'); // Parámetro de búsqueda
+            $perPage = $request->query('per_page', 30); // Número de elementos por página, por defecto 30
+
+            // Consulta inicial
+            $query = Component::with('status');
+
+            // Filtrar por búsqueda si el parámetro está presente
+            if ($search !== null) {
+                $query->where('name', 'like', '%' . $search . '%'); // Buscar por nombre del componente
+            }
+
+            // Obtener los componentes paginados
+            $components = $query->paginate($perPage);
+
+            // Metadatos para la paginación
+            $metaData = [
+                'page' => $components->currentPage(),
+                'per_page' => $components->perPage(),
+                'total' => $components->total(),
+                'last_page' => $components->lastPage(),
+            ];
+
+            return ApiResponse::create('Componentes obtenidos correctamente', 200, $components->items(), $metaData);
         } catch (Exception $e) {
-            return ApiResponse::create('Error al traer los componentes', 500, ['error' => $e->getMessage()]);
+            return ApiResponse::create('Error al traer los componentes', 500, [], ['error' => $e->getMessage()]);
         }
     }
+
 
     public function store(Request $request)
     {

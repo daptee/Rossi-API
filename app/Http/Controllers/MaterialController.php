@@ -12,17 +12,45 @@ use Illuminate\Support\Facades\Log;
 
 class MaterialController extends Controller
 {
-    public function index()
-    {
-        try {
-            $materials = Material::whereNull('id_material')->with('values', 'status')->get();
-            $materials = $this->buildTree($materials);
+    public function index(Request $request)
+{
+    try {
+        $search = $request->query('search'); // Parámetro de búsqueda
+        $perPage = $request->query('per_page', 30); // Número de elementos por página, por defecto 30
 
-            return ApiResponse::create('Succeeded', 200, $materials);
-        } catch (Exception $e) {
-            return ApiResponse::create('Error al traer todos los materiales', 500, ['error' => $e->getMessage()]);
+        // Consulta inicial con relaciones necesarias
+        $query = Material::whereNull('id_material')
+            ->with(['values', 'status']); // Relaciones necesarias
+
+        // Filtrar por búsqueda si el parámetro está presente
+        if ($search !== null) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', '%' . $search . '%'); // Buscar en el nombre del material
+            });
         }
+
+        // Obtener los materiales paginados
+        $materials = $query->paginate($perPage);
+
+        // Procesar la estructura jerárquica de los materiales
+        $materials->getCollection()->transform(function ($material) {
+            return $this->buildTree([$material]);
+        });
+
+        // Metadata para paginación
+        $metaData = [
+            'page' => $materials->currentPage(),
+            'per_page' => $materials->perPage(),
+            'total' => $materials->total(),
+            'last_page' => $materials->lastPage(),
+        ];
+
+        // Respuesta con ApiResponse
+        return ApiResponse::create('Materiales obtenidos correctamente', 200, $materials->items(), $metaData);
+    } catch (Exception $e) {
+        return ApiResponse::create('Error al traer todos los materiales', 500, [], ['error' => $e->getMessage()]);
     }
+}
 
     public function store(Request $request)
     {

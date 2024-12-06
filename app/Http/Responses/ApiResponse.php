@@ -9,15 +9,21 @@ class ApiResponse
      *
      * @param  string  $message
      * @param  int  $code
-     * @param  mixed  $result
+     * @param  mixed  $data
+     * @param  array|null  $meta
      * @return \Illuminate\Http\JsonResponse
      */
-    public static function create($message, $code, $result = [])
+    public static function create($message, $code, $data = [], $meta = null)
     {
         $response = [
             'message' => $message,
-            'data' => empty($result) ? null : $result, // Establecer data como null si result está vacío
+            'data' => empty($data) ? null : $data, // Establecer data como null si no hay datos
         ];
+
+        // Añadir metadata solo si no es nula
+        if ($meta !== null) {
+            $response['meta'] = $meta;
+        }
 
         return response()->json($response, $code);
     }
