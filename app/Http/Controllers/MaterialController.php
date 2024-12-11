@@ -13,57 +13,57 @@ use Illuminate\Support\Facades\Log;
 class MaterialController extends Controller
 {
     public function index(Request $request)
-{
-    try {
-        $search = $request->query('search'); // Parámetro de búsqueda
-        $perPage = $request->query('per_page', 10); // Número de elementos por página, por defecto 10
+    {
+        try {
+            $search = $request->query('search'); // Parámetro de búsqueda
+            $perPage = $request->query('per_page', 10); // Número de elementos por página, por defecto 10
 
-        // Consulta inicial para materiales padre
-        $query = Material::whereNull('id_material')->with('values', 'status');
+            // Consulta inicial para materiales padre
+            $query = Material::whereNull('id_material')->with('values', 'status');
 
-        if ($search) {
-            // Filtrar por nombre en materiales padre e hijos
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', '%' . $search . '%') // Buscar en el nombre del padre
-                    ->orWhereHas('children', function ($childQuery) use ($search) {
-                        $childQuery->where('name', 'like', '%' . $search . '%'); // Buscar en el nombre de los hijos
-                    });
+            if ($search) {
+                // Filtrar por nombre en materiales padre e hijos
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', '%' . $search . '%') // Buscar en el nombre del padre
+                        ->orWhereHas('submaterials', function ($childQuery) use ($search) {
+                            $childQuery->where('name', 'like', '%' . $search . '%'); // Buscar en el nombre de los hijos
+                        });
+                });
+            }
+
+            // Paginación
+            $materials = $query->paginate($perPage);
+
+            // Construcción del árbol jerárquico
+            $materials->getCollection()->transform(function ($material) {
+                return $this->buildTree([$material])->first(); // Aplicar buildTree
             });
-        }
 
-        // Paginación
-        $materials = $query->paginate($perPage);
+            // Metadata de paginación
+            $metaData = [
+                'page' => $materials->currentPage(),
+                'per_page' => $materials->perPage(),
+                'total' => $materials->total(),
+                'last_page' => $materials->lastPage(),
+            ];
 
-        // Construcción del árbol jerárquico
-        $materials->getCollection()->transform(function ($material) {
-            return $this->buildTree([$material])->first(); // Aplicar buildTree
-        });
-
-        // Metadata de paginación
-        $metaData = [
-            'page' => $materials->currentPage(),
-            'per_page' => $materials->perPage(),
-            'total' => $materials->total(),
-            'last_page' => $materials->lastPage(),
-        ];
-
-        return ApiResponse::create('Materiales obtenidos correctamente', 200, $materials->items(), $metaData);
-    } catch (Exception $e) {
-        return ApiResponse::create('Error al traer todos los materiales', 500, [], ['error' => $e->getMessage()]);
-    }
-}
-
-private function buildTree($materials)
-{
-    foreach ($materials as $material) {
-        $children = Material::where('id_material', $material->id)->with('values')->get();
-        if ($children->isNotEmpty()) {
-            $material->materials = $this->buildTree($children); // Construir el árbol recursivamente
+            return ApiResponse::create('Materiales obtenidos correctamente', 200, $materials->items(), $metaData);
+        } catch (Exception $e) {
+            return ApiResponse::create('Error al traer todos los materiales', 500, [], ['error' => $e->getMessage()]);
         }
     }
 
-    return collect($materials); // Devolver la colección
-}
+    private function buildTree($materials)
+    {
+        foreach ($materials as $material) {
+            $children = Material::where('id_material', $material->id)->with('values')->get();
+            if ($children->isNotEmpty()) {
+                $material->materials = $this->buildTree($children); // Construir el árbol recursivamente
+            }
+        }
+
+        return collect($materials); // Devolver la colección
+    }
 
     public function store(Request $request)
     {
@@ -401,5 +401,5 @@ private function buildTree($materials)
         }
     }
 
-    
+
 }
