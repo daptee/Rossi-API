@@ -208,21 +208,21 @@ class CategoriesController extends Controller
             if ($newGridData != null) {
                 foreach ($newGridData as $key => &$newGridItem) {
                     $fileField = 'file_' . ($key + 1);
-    
+
                     // Obtener el archivo actual de la `grid` guardada si existe
                     $existingGridItem = $existingGridData[$key] ?? null;
                     $existingFileUrl = $existingGridItem['props']['file']['url'] ?? null;
-    
+
                     if ($request->hasFile($fileField)) {
                         // Si hay un archivo nuevo, elimina el archivo existente si es diferente
                         if ($existingFileUrl && $existingFileUrl !== $newGridItem['props']['file']['url']) {
                             $this->deleteFile($existingFileUrl);
                         }
-    
+
                         // Guardar el nuevo archivo
                         $fileName = time() . '_' . $request->file($fileField)->getClientOriginalName();
                         $request->file($fileField)->move(public_path('storage/categories/grid/'), $fileName);
-    
+
                         // Actualizar la URL del archivo en la nueva `grid`
                         $newGridItem['props']['file']['url'] = 'storage/categories/grid/' . $fileName;
                     } elseif ($existingFileUrl && !isset($newGridItem['props']['file']['url'])) {
@@ -300,6 +300,83 @@ class CategoriesController extends Controller
 
         // Retornar la ruta antigua si no hubo cambios
         return $oldPath;
+    }
+
+    public function destroy($id)
+    {
+        try {
+            // Buscar la categoría
+            $category = Category::findOrFail($id);
+
+            // Eliminar categorías hijas recursivamente
+            $this->deleteChildren($category);
+
+            // Eliminar los archivos relacionados de la categoría principal
+            if ($category->img) {
+                $this->deleteFile(public_path($category->img));
+            }
+            if ($category->video) {
+                $this->deleteFile(public_path($category->video));
+            }
+            if ($category->icon) {
+                $this->deleteFile(public_path($category->icon));
+            }
+
+            if ($category->grid) {
+                $gridData = is_string($category->grid) ? json_decode($category->grid, true) : $category->grid;
+                foreach ($gridData as $gridItem) {
+                    $fileUrl = $gridItem['props']['file']['url'] ?? null;
+                    if ($fileUrl) {
+                        $this->deleteFile(public_path($fileUrl));
+                    }
+                }
+            }
+
+            // Eliminar la categoría principal
+            $category->delete();
+
+            return ApiResponse::create('Categoría y sus categorías hijas eliminadas correctamente', 200);
+        }catch (Exception $e) {
+            return ApiResponse::create('Error al eliminar la categoría', 500, ['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Eliminar categorías hijas de manera recursiva.
+     */
+    private function deleteChildren($category)
+    {
+        // Obtener las categorías hijas
+        $children = Category::where('id_category', $category->id)->get();
+
+        foreach ($children as $child) {
+            // Llamar recursivamente a este método para manejar los descendientes
+            $this->deleteChildren($child);
+
+            // Eliminar archivos relacionados con la categoría hija
+            if ($child->img) {
+                $this->deleteFile(public_path($child->img));
+            }
+            if ($child->video) {
+                $this->deleteFile(public_path($child->video));
+            }
+            if ($child->icon) {
+                $this->deleteFile(public_path($child->icon));
+            }
+
+            if ($child->grid) {
+                $gridData = is_string($child->grid) ? json_decode($child->grid, true) : $child->grid;
+                foreach ($gridData as $gridItem) {
+                    $fileUrl = $gridItem['props']['file']['url'] ?? null;
+                    if ($fileUrl) {
+                        $this->deleteFile(public_path($fileUrl));
+                    }
+                }
+            }
+
+            // Eliminar la categoría hija
+            $child->delete();
+        }
     }
 
     /**
