@@ -28,6 +28,7 @@ Route::group([
     Route::get('/', [CategoriesController::class, 'index']);
     Route::post('/', [CategoriesController::class, 'store'])->middleware('admin');
     Route::post('/{id}', [CategoriesController::class, 'update'])->middleware('admin');
+    Route::delete('/{id}', [CategoriesController::class, 'destroy'])->middleware('admin');
 });
 
 // Rutas de materiales
