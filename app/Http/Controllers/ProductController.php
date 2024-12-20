@@ -315,7 +315,7 @@ class ProductController extends Controller
             }
 
             // Palabras a ignorar en la búsqueda
-            $ignoreWords = ['silla', 'mesa', 'escritorio'];
+            $ignoreWords = ['silla', 'Silla', 'sillas', 'Sillas', 'mesa', 'Mesa', 'mesas', 'Mesas', 'escritorio', 'Escritorio', 'escritorios', 'Escritorios'];
 
             // Separar el nombre del producto principal en palabras y filtrar las ignoradas
             $productNameWords = collect(explode(' ', $product->name))
