@@ -68,7 +68,7 @@ class DistributorController extends Controller
                 'position.lat' => 'required|numeric|between:-90,90',
                 'position.lng' => 'required|numeric|between:-180,180',
                 'postal_code' => 'nullable|string|max:10', // Opcional
-                'web_url' => 'nullable|url|max:255',
+                'web_url' => 'nullable|string|max:255',
                 'phone' => 'nullable|string|max:20',
                 'whatsapp' => 'nullable|string|max:20',
                 'email' => 'nullable|email|max:100',
@@ -115,7 +115,7 @@ class DistributorController extends Controller
                 'position.lat' => 'required|numeric|between:-90,90',
                 'position.lng' => 'required|numeric|between:-180,180',
                 'postal_code' => 'nullable|string|max:10',
-                'web_url' => 'nullable|url|max:255',
+                'web_url' => 'nullable|string|max:255',
                 'phone' => 'nullable|string|max:20',
                 'whatsapp' => 'nullable|string|max:20',
                 'email' => 'nullable|email|max:100',
@@ -149,4 +149,22 @@ class DistributorController extends Controller
         }
     }
 
+    public function destroy($id)
+    {
+    try {
+        // Buscar el distribuidor por ID
+        $distributor = Distributor::find($id);
+
+        if (!$distributor) {
+            return ApiResponse::create('Distribuidor no encontrado', 404);
+        }
+
+        // Eliminar el distribuidor
+        $distributor->delete();
+
+        return ApiResponse::create('Distribuidor eliminado con éxito', 200);
+    } catch (Exception $e) {
+        return ApiResponse::create('Error al eliminar el distribuidor', 500, ['error' => $e->getMessage()]);
+    }
+}
 }
