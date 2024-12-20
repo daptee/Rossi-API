@@ -448,6 +448,9 @@ class CategoriesController extends Controller
 
                     if ($product) {
                         $gridItem['props']['product_info'] = $product; // Agregar información del producto
+                    } else {
+                        $gridItem['props']['type'] = 'null';
+                        $gridItem['props']['id'] = null;
                     }
                 }
             }
