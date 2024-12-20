@@ -19,6 +19,7 @@ class Product extends Model
         'description_underline',
         'status',
         'main_img',
+        'sub_img',
         'main_video',
         'file_data_sheet',
         'featured'
