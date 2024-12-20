@@ -15,6 +15,7 @@ class Category extends Model
         'id_category',
         'category',
         'img',
+        'sub_img',
         'video',
         'icon',
         'color',

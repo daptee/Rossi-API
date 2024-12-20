@@ -11,6 +11,7 @@ CREATE TABLE categories (
     id_category INT DEFAULT NULL,
     category VARCHAR(255) NOT NULL,
     img VARCHAR(255) DEFAULT NULL,
+    sub_img VARCHAR(255) DEFAULT NULL,
     video VARCHAR(255) DEFAULT NULL,
     icon VARCHAR(255) DEFAULT NULL,
     color VARCHAR(7) DEFAULT NULL,
