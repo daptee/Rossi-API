@@ -17,6 +17,7 @@ CREATE TABLE products (
     description_underline BOOLEAN DEFAULT FALSE,
     status INT NOT NULL,
     main_img VARCHAR(255),
+    sub_img VARCHAR(255),
     main_video VARCHAR(255),
     file_data_sheet VARCHAR(255),
     featured BOOLEAN DEFAULT FALSE,

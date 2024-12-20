@@ -75,6 +75,7 @@ class CategoriesController extends Controller
             $validator = Validator::make($request->all(), [
                 'category' => 'required|string|max:255',
                 'img' => 'nullable|file|mimes:jpg,jpeg,png|max:2048',
+                'sub_img' => 'nullable|file|mimes:jpg,jpeg,png|max:2048',
                 'video' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
                 'icon' => 'nullable|file|mimes:svg,png|max:2048',
                 'color' => 'nullable|string',
@@ -88,6 +89,7 @@ class CategoriesController extends Controller
             }
 
             $imgPath = null;
+            $subImgPath = null;
             $videoPath = null;
             $iconPath = null;
 
@@ -98,6 +100,12 @@ class CategoriesController extends Controller
                 $fileName = time() . '_' . $request->file('img')->getClientOriginalName();
                 $request->file('img')->move($baseStoragePath . 'images/', $fileName);
                 $imgPath = 'storage/categories/images/' . $fileName;
+            }
+
+            if ($request->hasFile('sub_img')) {
+                $fileName = time() . '_' . $request->file('sub_img')->getClientOriginalName();
+                $request->file('sub_img')->move($baseStoragePath . 'images/', $fileName);
+                $subImgPath = 'storage/categories/images/' . $fileName;
             }
 
             if ($request->hasFile('video')) {
@@ -138,6 +146,7 @@ class CategoriesController extends Controller
                 'id_category' => $request->input('id_category'),
                 'category' => $request->input('category'),
                 'img' => $imgPath,
+                'sub_img' => $subImgPath,
                 'video' => $videoPath,
                 'icon' => $iconPath,
                 'color' => $request->input('color'),
@@ -182,6 +191,7 @@ class CategoriesController extends Controller
             $validator = Validator::make($request->all(), [
                 'category' => 'required|string|max:255',
                 'img' => 'nullable',
+                'sub_img' => 'nullable',
                 'video' => 'nullable',
                 'icon' => 'nullable',
                 'color' => 'nullable|string',
@@ -197,6 +207,7 @@ class CategoriesController extends Controller
             $category = Category::findOrFail($id);
 
             $imgPath = $this->processField($request, 'img', $category->img, public_path('storage/categories/images/'));
+            $subImgPath = $this->processField($request, 'sub_img', $category->sub_img, public_path('storage/categories/images/'));
             $videoPath = $this->processField($request, 'video', $category->video, public_path('storage/categories/videos/'));
             $iconPath = $this->processField($request, 'icon', $category->icon, public_path('storage/categories/icons/'));
 
@@ -238,6 +249,7 @@ class CategoriesController extends Controller
                 'id_category' => $request->input('id_category'),
                 'category' => $request->input('category'),
                 'img' => $imgPath,
+                'sub_img' => $subImgPath,
                 'video' => $videoPath,
                 'icon' => $iconPath,
                 'color' => $request->input('color'),
@@ -315,6 +327,9 @@ class CategoriesController extends Controller
             if ($category->img) {
                 $this->deleteFile(public_path($category->img));
             }
+            if ($category->sub_img) {
+                $this->deleteFile(public_path($category->sub_img));
+            }
             if ($category->video) {
                 $this->deleteFile(public_path($category->video));
             }
@@ -356,6 +371,9 @@ class CategoriesController extends Controller
             // Eliminar archivos relacionados con la categoría hija
             if ($child->img) {
                 $this->deleteFile(public_path($child->img));
+            }
+            if ($child->sub_img) {
+                $this->deleteFile(public_path($child->sub_img));
             }
             if ($child->video) {
                 $this->deleteFile(public_path($child->video));

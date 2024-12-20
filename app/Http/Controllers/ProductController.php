@@ -27,7 +27,7 @@ class ProductController extends Controller
             $perPage = $request->query('per_page', 30);
 
             // Consulta inicial
-            $query = Product::select('products.id', 'products.name', 'products.main_img', 'products.status', 'products.featured', 'product_status.status_name', 'products.sku', 'products.slug', 'products.created_at')
+            $query = Product::select('products.id', 'products.name', 'products.main_img', 'products.sub_img', 'products.status', 'products.featured', 'product_status.status_name', 'products.sku', 'products.slug', 'products.created_at')
                 ->join('product_status', 'products.status', '=', 'product_status.id')
                 ->with(['categories.parent', 'materials', 'attributes', 'gallery', 'components'])
                 ->withCount(['categories', 'materials', 'attributes', 'gallery', 'components']);
@@ -75,6 +75,7 @@ class ProductController extends Controller
                     'name' => $product->name,
                     'sku' => $product->sku,
                     'main_img' => $product->main_img,
+                    'sub_img' => $product->sub_img,
                     'status' => [
                         'id' => $product->status,
                         'status_name' => $product->status_name,
@@ -120,18 +121,19 @@ class ProductController extends Controller
                 'components'
             ])
                 ->select(
-                    'id', 
-                    'name', 
-                    'slug', 
-                    'sku', 
-                    'description', 
-                    'description_bold', 
-                    'description_italic', 
-                    'description_underline', 
-                    'main_img', 
-                    'main_video', 
-                    'file_data_sheet', 
-                    'status', 
+                    'id',
+                    'name',
+                    'slug',
+                    'sku',
+                    'description',
+                    'description_bold',
+                    'description_italic',
+                    'description_underline',
+                    'main_img',
+                    'sub_img',
+                    'main_video',
+                    'file_data_sheet',
+                    'status',
                     'featured'
                 )
                 ->where('status', 2); // Solo productos con estado 2
@@ -145,8 +147,8 @@ class ProductController extends Controller
             if ($search !== null) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', '%' . $search . '%') // Buscar en el nombre
-                    ->orWhere('slug', 'like', '%' . $search . '%') // Buscar en el slug
-                    ->orWhere('description', 'like', '%' . $search . '%'); // Buscar en la descripción
+                        ->orWhere('slug', 'like', '%' . $search . '%') // Buscar en el slug
+                        ->orWhere('description', 'like', '%' . $search . '%'); // Buscar en la descripción
                 });
             }
 
@@ -218,7 +220,7 @@ class ProductController extends Controller
                 'gallery',
                 'components'
             ])
-                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'main_video', 'file_data_sheet', 'status', 'featured')
+                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'sub_img', 'main_video', 'file_data_sheet', 'status', 'featured')
                 ->findOrFail($id);
 
             // Limpia los datos del pivot para cada relación
@@ -276,7 +278,7 @@ class ProductController extends Controller
                 'gallery',
                 'components'
             ])
-                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'main_video', 'file_data_sheet', 'status', 'featured')
+                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'sub_img', 'main_video', 'file_data_sheet', 'status', 'featured')
                 ->where('sku', $sku)
                 ->firstOrFail();
 
@@ -356,6 +358,7 @@ class ProductController extends Controller
                 'description_underline' => 'nullable|required|in:1,0',
                 'status' => 'required|integer|exists:product_status,id',
                 'main_img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
+                'sub_img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
                 'main_video' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
                 'file_data_sheet' => 'nullable|file|mimes:pdf|max:5120',
                 'featured' => 'nullable|boolean',
@@ -395,8 +398,8 @@ class ProductController extends Controller
                 mkdir("$baseStoragePath/attributes", 0755, true);
 
             // Almacenar archivos principales en la carpeta 'public/storage/products'
-            // Almacenar archivos principales en la carpeta 'public/storage/products'
             $mainImgPath = $request->hasFile('main_img') ? $request->file('main_img')->move("$baseStoragePath/images", uniqid() . '_' . $request->file('main_img')->getClientOriginalName()) : null;
+            $subImgPath = $request->hasFile('sub_img') ? $request->file('sub_img')->move("$baseStoragePath/images", uniqid() . '_' . $request->file('sub_img')->getClientOriginalName()) : null;
             $mainVideoPath = $request->hasFile('main_video') ? $request->file('main_video')->move("$baseStoragePath/videos", uniqid() . '_' . $request->file('main_video')->getClientOriginalName()) : null;
             $fileDataSheetPath = $request->hasFile('file_data_sheet') ? $request->file('file_data_sheet')->move("$baseStoragePath/data_sheets", uniqid() . '_' . $request->file('file_data_sheet')->getClientOriginalName()) : null;
 
@@ -410,6 +413,7 @@ class ProductController extends Controller
                 'description_underline' => $request->description_underline,
                 'status' => $request->status,
                 'main_img' => $mainImgPath ? "storage/products/images/" . basename($mainImgPath) : null,
+                'sub_img' => $subImgPath ? "storage/products/images/" . basename($subImgPath) : null,
                 'main_video' => $mainVideoPath ? "storage/products/videos/" . basename($mainVideoPath) : null,
                 'file_data_sheet' => $fileDataSheetPath ? "storage/products/data_sheets/" . basename($fileDataSheetPath) : null,
                 'featured' => $request->featured,
@@ -518,6 +522,7 @@ class ProductController extends Controller
                 'description_underline' => 'nullable|required|in:1,0',
                 'status' => 'required|integer|exists:product_status,id',
                 'main_img' => 'nullable',
+                'sub_img' => 'nullable',
                 'main_video' => 'nullable',
                 'file_data_sheet' => 'nullable',
                 'featured' => 'nullable|boolean',
@@ -576,6 +581,25 @@ class ProductController extends Controller
                     $destinationPath = public_path('storage/products/images/');
                     $request->file('main_img')->move($destinationPath, $randomName);
                     $product->main_img = 'storage/products/images/' . $randomName;
+                }
+            }
+
+            if ($request->has('sub_img')) {
+                if (is_null($request->sub_img)) {
+                    if ($product->sub_img && file_exists(public_path($product->sub_img))) {
+                        unlink(public_path($product->sub_img));
+                    }
+                    $product->sub_img = null;
+                } elseif ($request->hasFile('sub_img')) {
+                    if ($product->sub_img && file_exists(public_path($product->sub_img))) {
+                        unlink(public_path($product->sub_img));
+                    }
+
+                    // Generar nombre aleatorio
+                    $randomName = uniqid() . '_' . $request->file('sub_img')->getClientOriginalName();
+                    $destinationPath = public_path('storage/products/images/');
+                    $request->file('sub_img')->move($destinationPath, $randomName);
+                    $product->sub_img = 'storage/products/images/' . $randomName;
                 }
             }
 
@@ -910,6 +934,14 @@ class ProductController extends Controller
                 }
             } catch (Exception $e) {
                 Log::error("Error al eliminar la imagen principal: " . $e->getMessage());
+            }
+
+            try {
+                if ($product->sub_img && file_exists(public_path($product->sub_img))) {
+                    unlink(public_path($product->sub_img));
+                }
+            } catch (Exception $e) {
+                Log::error("Error al eliminar la imagen secundaria: " . $e->getMessage());
             }
 
             // Intentar eliminar el video principal si existe
