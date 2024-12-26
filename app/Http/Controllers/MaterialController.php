@@ -16,7 +16,7 @@ class MaterialController extends Controller
     {
         try {
             $search = $request->query('search'); // Parámetro de búsqueda
-            $perPage = $request->query('per_page', 10); // Número de elementos por página, por defecto 10
+            $perPage = $request->query('per_page'); // Número de elementos por página, por defecto es nulo
 
             // Consulta inicial para materiales padre
             $query = Material::whereNull('id_material')->with('values', 'status');
@@ -31,23 +31,32 @@ class MaterialController extends Controller
                 });
             }
 
-            // Paginación
-            $materials = $query->paginate($perPage);
+            // Verificar si se debe aplicar paginación o devolver todos los registros
+            if ($perPage !== null) {
+                $materials = $query->paginate((int) $perPage); // Aplicar paginación
+                $metaData = [
+                    'page' => $materials->currentPage(),
+                    'per_page' => $materials->perPage(),
+                    'total' => $materials->total(),
+                    'last_page' => $materials->lastPage(),
+                ];
+                $data = $materials->items();
+            } else {
+                $materialsCollection = $query->get(); // Obtener todos los registros
+                $materialsCollection = $materialsCollection->map(function ($material) {
+                    return $this->buildTree([$material])->first(); // Construir el árbol jerárquico
+                });
 
-            // Construcción del árbol jerárquico
-            $materials->getCollection()->transform(function ($material) {
-                return $this->buildTree([$material])->first(); // Aplicar buildTree
-            });
+                $data = $materialsCollection;
+                $metaData = [
+                    'total' => $materialsCollection->count(),
+                    'per_page' => 'Todos',
+                    'page' => 1,
+                    'last_page' => 1,
+                ];
+            }
 
-            // Metadata de paginación
-            $metaData = [
-                'page' => $materials->currentPage(),
-                'per_page' => $materials->perPage(),
-                'total' => $materials->total(),
-                'last_page' => $materials->lastPage(),
-            ];
-
-            return ApiResponse::create('Materiales obtenidos correctamente', 200, $materials->items(), $metaData);
+            return ApiResponse::create('Materiales obtenidos correctamente', 200, $data, $metaData);
         } catch (Exception $e) {
             return ApiResponse::create('Error al traer todos los materiales', 500, [], ['error' => $e->getMessage()]);
         }

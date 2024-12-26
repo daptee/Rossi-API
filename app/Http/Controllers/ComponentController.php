@@ -15,7 +15,7 @@ class ComponentController extends Controller
     {
         try {
             $search = $request->query('search'); // Parámetro de búsqueda
-            $perPage = $request->query('per_page', 30); // Número de elementos por página, por defecto 30
+            $perPage = $request->query('per_page'); // Número de elementos por página
 
             // Consulta inicial
             $query = Component::with('status');
@@ -25,23 +25,31 @@ class ComponentController extends Controller
                 $query->where('name', 'like', '%' . $search . '%'); // Buscar por nombre del componente
             }
 
-            // Obtener los componentes paginados
-            $components = $query->paginate($perPage);
+            // Verificar si se debe paginar o traer todos
+            if ($perPage !== null) {
+                $components = $query->paginate((int) $perPage); // Paginar si se especifica el parámetro
+                $metaData = [
+                    'page' => $components->currentPage(),
+                    'per_page' => $components->perPage(),
+                    'total' => $components->total(),
+                    'last_page' => $components->lastPage(),
+                ];
+                $data = $components->items();
+            } else {
+                $data = $query->get(); // Traer todos los registros si no hay paginación
+                $metaData = [
+                    'total' => $data->count(),
+                    'per_page' => 'Todos',
+                    'page' => 1,
+                    'last_page' => 1,
+                ];
+            }
 
-            // Metadatos para la paginación
-            $metaData = [
-                'page' => $components->currentPage(),
-                'per_page' => $components->perPage(),
-                'total' => $components->total(),
-                'last_page' => $components->lastPage(),
-            ];
-
-            return ApiResponse::create('Componentes obtenidos correctamente', 200, $components->items(), $metaData);
+            return ApiResponse::create('Componentes obtenidos correctamente', 200, $data, $metaData);
         } catch (Exception $e) {
             return ApiResponse::create('Error al traer los componentes', 500, [], ['error' => $e->getMessage()]);
         }
     }
-
 
     public function store(Request $request)
     {
