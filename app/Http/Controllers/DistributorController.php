@@ -17,7 +17,7 @@ class DistributorController extends Controller
     {
         try {
             $search = $request->query('search'); // Parámetro de búsqueda
-            $perPage = $request->query('per_page', 30); // Número de elementos por página, por defecto 30
+            $perPage = $request->query('per_page'); // Número de elementos por página, por defecto es nulo
             $status = $request->query('status');
 
             // Consulta inicial
@@ -42,22 +42,32 @@ class DistributorController extends Controller
                 });
             }
 
-            // Obtener distribuidores paginados
-            $distributors = $query->paginate($perPage);
+            // Verificar si el parámetro per_page está presente
+            if ($perPage !== null) {
+                $distributors = $query->paginate((int) $perPage); // Paginación si se especifica per_page
+                $metaData = [
+                    'page' => $distributors->currentPage(),
+                    'per_page' => $distributors->perPage(),
+                    'total' => $distributors->total(),
+                    'last_page' => $distributors->lastPage(),
+                ];
+                $data = $distributors->items();
+            } else {
+                $data = $query->get(); // Traer todos los registros si no se especifica per_page
+                $metaData = [
+                    'total' => $data->count(),
+                    'per_page' => 'Todos',
+                    'page' => 1,
+                    'last_page' => 1,
+                ];
+            }
 
-            // Metadatos para la paginación
-            $metaData = [
-                'page' => $distributors->currentPage(),
-                'per_page' => $distributors->perPage(),
-                'total' => $distributors->total(),
-                'last_page' => $distributors->lastPage(),
-            ];
-
-            return ApiResponse::create('Distribuidores obtenidos correctamente', 200, $distributors->items(), $metaData);
+            return ApiResponse::create('Distribuidores obtenidos correctamente', 200, $data, $metaData);
         } catch (Exception $e) {
             return ApiResponse::create('Error al obtener los distribuidores', 500, [], ['error' => $e->getMessage()]);
         }
     }
+
 
     // POST - Crear un nuevo producto
     public function store(Request $request)

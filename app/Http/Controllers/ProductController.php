@@ -24,7 +24,7 @@ class ProductController extends Controller
         try {
             $category_id = $request->query('category_id');
             $search = $request->query('search');
-            $perPage = $request->query('per_page', 30);
+            $perPage = $request->query('per_page', 300000000);
 
             // Consulta inicial
             $query = Product::select('products.id', 'products.name', 'products.main_img', 'products.sub_img', 'products.status', 'products.featured', 'product_status.status_name', 'products.sku', 'products.slug', 'products.created_at')
@@ -91,12 +91,23 @@ class ProductController extends Controller
                 ];
             });
 
-            $metaData = [
-                'page' => $products->currentPage(),
-                'per_page' => $products->perPage(),
-                'total' => $products->total(),
-                'last_page' => $products->lastPage(),
-            ];
+            if ($perPage === 300000000) {
+                $metaData = [
+                    'page' => $products->currentPage(),
+                    'per_page' => null,
+                    'total' => $products->total(),
+                    'last_page' => $products->lastPage(),
+                ];
+            } else {
+                $metaData = [
+                    'page' => $products->currentPage(),
+                    'per_page' => $products->perPage(),
+                    'total' => $products->total(),
+                    'last_page' => $products->lastPage(),
+                ];
+            }
+
+            
 
             return ApiResponse::create('Productos obtenidos correctamente', 200, $products->items(), $metaData);
         } catch (Exception $e) {
