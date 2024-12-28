@@ -14,13 +14,21 @@ class Component extends Model
 
     // Definir los campos que se pueden asignar masivamente
     protected $fillable = [
+        'id_component',
         'name',
         'img',
-        'status'
+        'description',
+        'status',
+        'id_category'
     ];
 
     public function status()
     {
         return $this->belongsTo(Status::class, 'status', 'id');
+    }
+
+    public function components()
+    {
+        return $this->hasMany(Component::class, 'id_component');
     }
 }
