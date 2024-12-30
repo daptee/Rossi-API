@@ -17,8 +17,13 @@ class ComponentController extends Controller
             $search = $request->query('search'); // Parámetro de búsqueda
             $perPage = $request->query('per_page'); // Número de elementos por página
 
-            // Consulta inicial
-            $query = Component::with('status');
+            // Consulta inicial: solo componentes padre
+            $query = Component::with([
+                'status',
+                'components' => function ($query) {
+                    $query->with('status'); // Incluir el estado de los hijos
+                }
+            ])->whereNull('id_component'); // Filtrar para que solo sean padres
 
             // Filtrar por búsqueda si el parámetro está presente
             if ($search !== null) {
@@ -51,13 +56,17 @@ class ComponentController extends Controller
         }
     }
 
+
     public function store(Request $request)
     {
         try {
             $validator = Validator::make($request->all(), [
+                'id_component' => 'nullable|exists:components,id',
                 'name' => 'required|string|max:255',
+                'description' => 'nullable|string',
                 'img' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
                 'status' => 'required|integer|exists:status,id',
+                'id_category' => 'nullable|exists:categories,id',
             ]);
 
             if ($validator->fails()) {
@@ -81,9 +90,12 @@ class ComponentController extends Controller
             }
 
             $component = Component::create([
+                'id_component' => $request->id_component,
                 'name' => $request->name,
+                'description' => $request->description,
                 'img' => $imgPath,
                 'status' => $request->status,
+                'id_category' => 1,
             ]);
 
             $component->load('status');
@@ -98,9 +110,12 @@ class ComponentController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
+                'id_component' => 'nullable|exists:components,id',
                 'name' => 'sometimes|required|string|max:255',
+                'description' => 'nullable|string',
                 'img' => 'sometimes|required|image|mimes:jpeg,png,jpg,gif|max:2048',
                 'status' => 'required|integer|exists:status,id',
+                'id_category' => 'nullable|exists:categories,id',
             ]);
 
             if ($validator->fails()) {
@@ -129,13 +144,25 @@ class ComponentController extends Controller
                 $component->img = 'storage/components/images/' . $fileName;
             }
 
+            if ($request->has('id_component')) {
+                $component->id_component = $request->id_component;
+            }
+
             // Actualiza el nombre si se ha enviado en la solicitud
             if ($request->has('name')) {
                 $component->name = $request->name;
             }
 
+            if ($request->has('description')) {
+                $component->description = $request->description;
+            }
+
             if ($request->has('status')) {
                 $component->status = $request->status;
+            }
+
+            if ($request->has('id_category')) {
+                $component->id_category = '1';
             }
 
             $component->save();
