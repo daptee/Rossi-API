@@ -31,4 +31,9 @@ class Component extends Model
     {
         return $this->hasMany(Component::class, 'id_component');
     }
+
+    public function children()
+    {
+        return $this->hasMany(Component::class, 'id_component', 'id');
+    }
 }
