@@ -24,7 +24,7 @@ class ProductController extends Controller
         try {
             $category_id = $request->query('category_id');
             $search = $request->query('search');
-            $perPage = $request->query('per_page', 30);
+            $perPage = $request->query('per_page', 300000000);
 
             // Consulta inicial
             $query = Product::select('products.id', 'products.name', 'products.main_img', 'products.sub_img', 'products.status', 'products.featured', 'product_status.status_name', 'products.sku', 'products.slug', 'products.created_at')
@@ -91,12 +91,23 @@ class ProductController extends Controller
                 ];
             });
 
-            $metaData = [
-                'page' => $products->currentPage(),
-                'per_page' => $products->perPage(),
-                'total' => $products->total(),
-                'last_page' => $products->lastPage(),
-            ];
+            if ($perPage === 300000000) {
+                $metaData = [
+                    'page' => $products->currentPage(),
+                    'per_page' => null,
+                    'total' => $products->total(),
+                    'last_page' => $products->lastPage(),
+                ];
+            } else {
+                $metaData = [
+                    'page' => $products->currentPage(),
+                    'per_page' => $products->perPage(),
+                    'total' => $products->total(),
+                    'last_page' => $products->lastPage(),
+                ];
+            }
+
+            
 
             return ApiResponse::create('Productos obtenidos correctamente', 200, $products->items(), $metaData);
         } catch (Exception $e) {
@@ -317,8 +328,15 @@ class ProductController extends Controller
             }
 
             // Palabras a ignorar en la búsqueda
-            $ignoreWords = ['silla', 'Silla', 'sillas', 'Sillas', 'mesa', 'Mesa', 'mesas', 'Mesas', 'escritorio', 'Escritorio', 'escritorios', 'Escritorios'];
-
+            $ignoreWords = [
+                'silla', 'Silla', 'SILLA', 
+                'sillas', 'Sillas', 'SILLAS', 
+                'mesa', 'Mesa', 'MESA', 
+                'mesas', 'Mesas', 'MESAS', 
+                'escritorio', 'Escritorio', 'ESCRITORIO', 
+                'escritorios', 'Escritorios', 'ESCRITORIOS'
+            ];
+            
             // Separar el nombre del producto principal en palabras y filtrar las ignoradas
             $productNameWords = collect(explode(' ', $product->name))
                 ->reject(fn($word) => in_array(strtolower($word), $ignoreWords))

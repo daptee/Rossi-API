@@ -17,7 +17,7 @@ class CategoriesController extends Controller
     {
         try {
             $search = $request->query('search'); // Parámetro de búsqueda
-            $perPage = $request->query('per_page', 30); // Número de elementos por página, por defecto 30
+            $perPage = $request->query('per_page'); // Número de elementos por página o null si no está definido
 
             // Consulta inicial con relaciones necesarias
             $query = Category::with(['categories', 'status'])
@@ -27,20 +27,35 @@ class CategoriesController extends Controller
             if ($search !== null) {
                 // Buscar en categorías principales o subcategorías
                 $query->where(function ($q) use ($search) {
-                    // Buscar en el nombre de las categorías principales
                     $q->where('category', 'like', '%' . $search . '%')
-                        // O buscar en las subcategorías
                         ->orWhereHas('categories', function ($subQuery) use ($search) {
                             $subQuery->where('category', 'like', '%' . $search . '%');
                         });
                 });
             }
 
-            // Obtener las categorías paginadas
-            $categories = $query->paginate($perPage);
+            // Obtener categorías con o sin paginación
+            if ($perPage !== null) {
+                $categories = $query->paginate((int) $perPage);
+                $metaData = [
+                    'page' => $categories->currentPage(),
+                    'per_page' => $categories->perPage(),
+                    'total' => $categories->total(),
+                    'last_page' => $categories->lastPage(),
+                ];
+                $collection = $categories->getCollection();
+            } else {
+                $collection = $query->get();
+                $metaData = [
+                    'total' => $collection->count(),
+                    'per_page' => 'Todos',
+                    'page' => 1,
+                    'last_page' => 1,
+                ];
+            }
 
             // Procesar cada categoría y sus subcategorías
-            $categories->getCollection()->transform(function ($category) {
+            $collection->transform(function ($category) {
                 $category = $this->removeEmptyCategories($category);
                 $category = $this->attachProductInfoToGrid($category);
 
@@ -53,16 +68,8 @@ class CategoriesController extends Controller
                 return $category;
             });
 
-            // Metadata para paginación
-            $metaData = [
-                'page' => $categories->currentPage(),
-                'per_page' => $categories->perPage(),
-                'total' => $categories->total(),
-                'last_page' => $categories->lastPage(),
-            ];
-
             // Respuesta con ApiResponse
-            return ApiResponse::create('Categorías obtenidas correctamente', 200, $categories->items(), $metaData);
+            return ApiResponse::create('Categorías obtenidas correctamente', 200, $collection, $metaData);
         } catch (Exception $e) {
             return ApiResponse::create('Error al traer todas las categorías', 500, [], ['error' => $e->getMessage()]);
         }
@@ -351,7 +358,7 @@ class CategoriesController extends Controller
             $category->delete();
 
             return ApiResponse::create('Categoría y sus categorías hijas eliminadas correctamente', 200);
-        }catch (Exception $e) {
+        } catch (Exception $e) {
             return ApiResponse::create('Error al eliminar la categoría', 500, ['error' => $e->getMessage()]);
         }
     }
@@ -448,6 +455,9 @@ class CategoriesController extends Controller
 
                     if ($product) {
                         $gridItem['props']['product_info'] = $product; // Agregar información del producto
+                    } else {
+                        $gridItem['props']['type'] = 'null';
+                        $gridItem['props']['id'] = null;
                     }
                 }
             }

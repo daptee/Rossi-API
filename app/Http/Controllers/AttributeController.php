@@ -16,7 +16,7 @@ class AttributeController extends Controller
     {
         try {
             $search = $request->query('search'); // Parámetro de búsqueda
-            $perPage = $request->query('per_page', 30); // Número de elementos por página, por defecto 30
+            $perPage = $request->query('per_page'); // Número de elementos por página o null si no está definido
 
             // Consulta inicial
             $query = Attribute::whereNull('id_attribute')->with('values', 'status');
@@ -24,17 +24,34 @@ class AttributeController extends Controller
             if ($search !== null) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', '%' . $search . '%') // Buscar en el nombre de los padres
-                    ->orWhereHas('children', function ($subQuery) use ($search) {
-                        $subQuery->where('name', 'like', '%' . $search . '%'); // Buscar en los hijos
-                    });
+                        ->orWhereHas('children', function ($subQuery) use ($search) {
+                            $subQuery->where('name', 'like', '%' . $search . '%'); // Buscar en los hijos
+                        });
                 });
             }
 
-            // Paginación
-            $attributes = $query->paginate($perPage);
+            // Obtener atributos con o sin paginación
+            if ($perPage !== null) {
+                $attributes = $query->paginate((int) $perPage);
+                $metaData = [
+                    'page' => $attributes->currentPage(),
+                    'per_page' => $attributes->perPage(),
+                    'total' => $attributes->total(),
+                    'last_page' => $attributes->lastPage(),
+                ];
+                $collection = $attributes->getCollection();
+            } else {
+                $collection = $query->get();
+                $metaData = [
+                    'total' => $collection->count(),
+                    'per_page' => 'Todos',
+                    'page' => 1,
+                    'last_page' => 1,
+                ];
+            }
 
             // Procesar la estructura jerárquica
-            $attributes->getCollection()->transform(function ($attribute) use ($search) {
+            $collection->transform(function ($attribute) use ($search) {
                 if ($search) {
                     // Si se está buscando, incluir solo los hijos que coinciden
                     $attribute->attributes = $this->filterChildren($attribute, $search);
@@ -45,15 +62,7 @@ class AttributeController extends Controller
                 return $attribute;
             });
 
-            // Metadatos para la paginación
-            $metaData = [
-                'page' => $attributes->currentPage(),
-                'per_page' => $attributes->perPage(),
-                'total' => $attributes->total(),
-                'last_page' => $attributes->lastPage(),
-            ];
-
-            return ApiResponse::create('Atributos obtenidos correctamente', 200, $attributes->items(), $metaData);
+            return ApiResponse::create('Atributos obtenidos correctamente', 200, $collection, $metaData);
         } catch (Exception $e) {
             return ApiResponse::create('Error al traer todos los atributos', 500, [], ['error' => $e->getMessage()]);
         }
