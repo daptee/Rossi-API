@@ -197,6 +197,16 @@ class ComponentController extends Controller
 
             // Procesar subcomponentes
             if ($request->has('subComponents')) {
+                // Eliminar subcomponentes no incluidos en la solicitud
+                $requestedIds = collect($request->subComponents)->pluck('id')->filter();
+                $component->children()->whereNotIn('id', $requestedIds)->get()->each(function ($subComponent) {
+                    if ($subComponent->img && file_exists(public_path($subComponent->img))) {
+                        unlink(public_path($subComponent->img));
+                    }
+                    $subComponent->delete();
+                });
+
+
                 $existingSubComponents = $component->children->keyBy('id');
 
                 foreach ($request->subComponents as $index => $subComponentData) {
@@ -241,32 +251,25 @@ class ComponentController extends Controller
                             ]);
                         }
                     } else {
-                        // Procesar creación de nuevos subcomponentes
+                        // Crear nuevos subcomponentes
                         $newImgPath = null;
-
+    
                         if ($request->hasFile("subComponents.{$index}.img")) {
                             $fileName = time() . '_subcomponent_' . $request->file("subComponents.{$index}.img")->getClientOriginalName();
                             $request->file("subComponents.{$index}.img")->move($baseStoragePath, $fileName);
                             $newImgPath = 'storage/components/images/' . $fileName;
                         }
-
+    
                         $component->children()->create([
                             'name' => $subComponentData['name'],
-                            'description' => $subComponentData['description'] ?? null,
+                            'description' => $subComponentData['description'] ?? '',
                             'img' => $newImgPath,
-                            'status' => $subComponentData['status'],
+                            'status' => $subComponentData['status'] ?? 2, // Asignar un estado por defecto si no se proporciona
+                            'id_category' => 1,
                         ]);
+
                     }
                 }
-
-                // Eliminar subcomponentes no incluidos en la solicitud
-                $requestedIds = collect($request->subComponents)->pluck('id')->filter();
-                $component->children()->whereNotIn('id', $requestedIds)->get()->each(function ($subComponent) {
-                    if ($subComponent->img && file_exists(public_path($subComponent->img))) {
-                        unlink(public_path($subComponent->img));
-                    }
-                    $subComponent->delete();
-                });
             }
 
             $component->load('status', 'children');
