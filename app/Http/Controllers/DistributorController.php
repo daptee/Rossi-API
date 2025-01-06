@@ -22,7 +22,7 @@ class DistributorController extends Controller
 
             // Consulta inicial
             $query = Distributor::query()
-                ->with(['locality.province', 'status']);
+                ->with(['province', 'locality', 'status']);
 
             // Filtrar por estado si el parámetro está presente
             if ($status !== null) {
@@ -78,6 +78,7 @@ class DistributorController extends Controller
                 'name' => 'required|string|max:150',
                 'address' => 'required|string|max:255',
                 'number' => 'required|string|max:10',
+                'province_id' => 'required|integer|exists:provinces,id',
                 'locality_id' => 'required|integer|exists:localities,id',
                 'locality' => 'required|string|max:255',
                 'position' => ['required', 'array'],
@@ -107,7 +108,7 @@ class DistributorController extends Controller
             $distributor = Distributor::create($data);
 
             // Cargar relaciones necesarias
-            $distributor->load('locality.province', 'status');
+            $distributor->load('province', 'locality', 'status');
 
             return ApiResponse::create('Distribuidor creado con éxito', 200, $distributor);
         } catch (Exception $e) {
@@ -125,6 +126,7 @@ class DistributorController extends Controller
                 'name' => 'required|string|max:150',
                 'number' => 'required|string|max:10',
                 'address' => 'required|string|max:255',
+                'province_id' => 'required|integer|exists:provinces,id',
                 'locality_id' => 'required|integer|exists:localities,id',
                 'locality' => 'nullable|string|max:255',
                 'position' => ['required', 'array'],
