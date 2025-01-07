@@ -123,15 +123,15 @@ class DistributorController extends Controller
         try {
             // Validación de los datos recibidos
             $validator = Validator::make($request->all(), [
-                'name' => 'required|string|max:150',
-                'number' => 'required|string|max:10',
-                'address' => 'required|string|max:255',
-                'province_id' => 'required|integer|exists:provinces,id',
-                'locality_id' => 'required|integer|exists:localities,id',
+                'name' => 'nullable|string|max:150',
+                'number' => 'nullable|string|max:10',
+                'address' => 'nullable|string|max:255',
+                'province_id' => 'nullable|integer|exists:provinces,id',
+                'locality_id' => 'nullable|integer|exists:localities,id',
                 'locality' => 'nullable|string|max:255',
-                'position' => ['required', 'array'],
-                'position.lat' => 'required|numeric|between:-90,90',
-                'position.lng' => 'required|numeric|between:-180,180',
+                'position' => ['nullable', 'array'],
+                'position.lat' => 'nullable|numeric|between:-90,90',
+                'position.lng' => 'nullable|numeric|between:-180,180',
                 'postal_code' => 'nullable|string|max:10',
                 'web_url' => 'nullable|string|max:255',
                 'phone' => 'nullable|string|max:20',
@@ -139,7 +139,7 @@ class DistributorController extends Controller
                 'email' => 'nullable|email|max:100',
                 'instagram' => 'nullable|string|max:100',
                 'facebook' => 'nullable|string|max:100',
-                'status' => 'required|integer|exists:status,id',
+                'status' => 'nullable|integer|exists:status,id',
             ]);
 
             if ($validator->fails()) {
@@ -166,7 +166,7 @@ class DistributorController extends Controller
             return ApiResponse::create('Error al actualizar un distribuidor', 500, ['error' => $e->getMessage()]);
         }
     }
-
+    
     public function destroy($id)
     {
         try {
