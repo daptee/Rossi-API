@@ -333,7 +333,7 @@ class ProductController extends Controller
             'taburete', 'taburetes', 'wood', 'woods', 'tapizada', 'tapizadas',
             'neumática', 'neumáticas', 'sillon', 'sillones', 'tándem', 'tndem',
             'tándems', 'operativa', 'operativas', 'ejecutiva', 'ejecutivas',
-            'gerencial', 'gerenciales', 'componente', 'componentes', 'escolares'
+            'gerencial', 'gerenciales', 'componente', 'componentes', 'escolares', 'tapizado', 'tapizados'
         ])->map(fn($word) => $this->normalizeString($word));
 
         // Normalizar el nombre del producto y separarlo en palabras
