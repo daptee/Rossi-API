@@ -275,7 +275,7 @@ class ProductController extends Controller
             return ApiResponse::create('Error al obtener el producto', 500, ['error' => $e->getMessage()]);
         }
     }
-
+        
     public function skuProduct($sku)
 {
     try {
@@ -327,17 +327,19 @@ class ProductController extends Controller
             ];
         }
 
-        // Lista de palabras a ignorar, convertidas a minúsculas
+        // Lista de palabras a ignorar
         $ignoreWords = collect([
             'silla', 'sillas', 'mesa', 'mesas', 'escritorio', 'escritorios',
             'taburete', 'taburetes', 'wood', 'woods', 'tapizada', 'tapizadas',
-            'neumática', 'neumáticas', 'sillon', 'sillones', 'tandem', 'tándem', 'tndem',
+            'neumática', 'neumáticas', 'sillon', 'sillones', 'tándem', 'tndem',
             'tándems', 'operativa', 'operativas', 'ejecutiva', 'ejecutivas',
             'gerencial', 'gerenciales', 'componente', 'componentes', 'escolares'
-        ])->map(fn($word) => strtolower($word))->toArray();
+        ])
+        ->map(fn($word) => $this->normalizeString($word))
+        ->toArray();
 
-        // Separar el nombre del producto principal en palabras y filtrar las ignoradas
-        $productNameWords = collect(explode(' ', strtolower($product->name)))
+        // Normalizar el nombre del producto y separarlo en palabras
+        $productNameWords = collect(explode(' ', $this->normalizeString($product->name)))
             ->reject(fn($word) => in_array($word, $ignoreWords))
             ->values();
 
@@ -360,6 +362,14 @@ class ProductController extends Controller
     } catch (Exception $e) {
         return ApiResponse::create('Error al obtener el producto', 500, ['error' => $e->getMessage()]);
     }
+}
+
+/**
+ * Función para normalizar cadenas eliminando acentos y caracteres especiales.
+ */
+private function normalizeString($string)
+{
+    return strtolower(preg_replace('/[^a-z0-9]/', '', iconv('UTF-8', 'ASCII//TRANSLIT', $string)));
 }
 
     // POST - Crear un nuevo producto
