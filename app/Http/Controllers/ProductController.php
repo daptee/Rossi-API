@@ -107,7 +107,7 @@ class ProductController extends Controller
                 ];
             }
 
-            
+
 
             return ApiResponse::create('Productos obtenidos correctamente', 200, $products->items(), $metaData);
         } catch (Exception $e) {
@@ -334,19 +334,29 @@ class ProductController extends Controller
                 'mesa', 'Mesa', 'MESA', 
                 'mesas', 'Mesas', 'MESAS', 
                 'escritorio', 'Escritorio', 'ESCRITORIO', 
-                'escritorios', 'Escritorios', 'ESCRITORIOS'
+                'escritorios', 'Escritorios', 'ESCRITORIOS',
+                'taburete', 'Taburete', 'TABURETE', 
+                'taburetes', 'Taburetes', 'TABURETES', 
+                'wood', 'Wood', 'WOOD', 
+                'woods', 'Woods', 'WOODS', 
+                'tapizada', 'Tapizada', 'TAPIZADA', 
+                'tapizadas', 'Tapizadas', 'TAPIZADAS', 
+                'neumática', 'Neumática', 'NEUMÁTICA', 
+                'neumáticas', 'Neumáticas', 'NEUMÁTICAS', 
+                'sillon', 'Sillon', 'SILLON', 
+                'sillones', 'Sillones', 'SILLONES',
             ];
-            
+
             // Separar el nombre del producto principal en palabras y filtrar las ignoradas
             $productNameWords = collect(explode(' ', $product->name))
                 ->reject(fn($word) => in_array(strtolower($word), $ignoreWords))
                 ->values();
 
-            // Buscar productos relacionados que contengan al menos una de las palabras clave
+            // Buscar productos relacionados que contengan alguna de las palabras exactas
             $relatedProducts = Product::select('id', 'name', 'slug', 'sku', 'main_img')
                 ->where(function ($query) use ($productNameWords) {
                     foreach ($productNameWords as $word) {
-                        $query->orWhere('name', 'LIKE', '%' . $word . '%');
+                        $query->orWhereRaw('name REGEXP ?', ["\\b" . preg_quote($word) . "\\b"]);
                     }
                 })
                 ->where('id', '!=', $product->id) // Excluir el producto principal
@@ -360,6 +370,7 @@ class ProductController extends Controller
             return ApiResponse::create('Error al obtener el producto', 500, ['error' => $e->getMessage()]);
         }
     }
+
 
     // POST - Crear un nuevo producto
     public function store(Request $request)

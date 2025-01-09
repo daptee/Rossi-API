@@ -3,6 +3,7 @@ CREATE TABLE distributors (
     name VARCHAR(150) NOT NULL,
     address VARCHAR(255) NOT NULL,
     number VARCHAR(255) NOT NULL,
+    province_id INT NOT NULL,
     locality_id INT NOT NULL,
     locality VARCHAR(255) NOT NULL,
     postal_code VARCHAR(10) DEFAULT NULL,
@@ -16,5 +17,6 @@ CREATE TABLE distributors (
     position JSON DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (locality_id) REFERENCES localities(id)
+    FOREIGN KEY (locality_id) REFERENCES localities(id),
+    FOREIGN KEY (province_id) REFERENCES provinces(id)
 );

@@ -13,6 +13,7 @@ class Distributor extends Model
         'name',
         'address',
         'number',
+        'province_id',
         'locality_id',        
         'locality',
         'position',
@@ -29,6 +30,11 @@ class Distributor extends Model
     protected $casts = [
         'position' => 'array',
     ];
+
+    public function province()
+    {
+        return $this->belongsTo(Province::class);
+    }
 
     public function locality()
     {
