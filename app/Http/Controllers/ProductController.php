@@ -331,7 +331,7 @@ class ProductController extends Controller
         $ignoreWords = collect([
             'silla', 'sillas', 'mesa', 'mesas', 'escritorio', 'escritorios',
             'taburete', 'taburetes', 'wood', 'woods', 'tapizada', 'tapizadas',
-            'neumática', 'neumáticas', 'sillon', 'sillones', 'tándem', 'tndem',
+            'neumática', 'neumáticas', 'sillon', 'sillones', 'tandem', 'tándem', 'tndem',
             'tándems', 'operativa', 'operativas', 'ejecutiva', 'ejecutivas',
             'gerencial', 'gerenciales', 'componente', 'componentes', 'escolares'
         ])->map(fn($word) => strtolower($word))->toArray();
