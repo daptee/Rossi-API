@@ -233,9 +233,9 @@ class CategoriesController extends Controller
 
                     if ($request->hasFile($fileField)) {
                         // Si hay un archivo nuevo, elimina el archivo existente si es diferente
-                        if ($existingFileUrl && $existingFileUrl !== $newGridItem['props']['file']['url']) {
+                       /*  if ($existingFileUrl && $existingFileUrl !== $newGridItem['props']['file']['url']) {
                             $this->deleteFile($existingFileUrl);
-                        }
+                        } */
 
                         // Guardar el nuevo archivo
                         $fileName = time() . '_' . $request->file($fileField)->getClientOriginalName();
@@ -243,11 +243,11 @@ class CategoriesController extends Controller
 
                         // Actualizar la URL del archivo en la nueva `grid`
                         $newGridItem['props']['file']['url'] = 'storage/categories/grid/' . $fileName;
-                    } elseif ($existingFileUrl && !isset($newGridItem['props']['file']['url'])) {
+                    } /* elseif ($existingFileUrl && !isset($newGridItem['props']['file']['url'])) {
                         // Si no se envía un archivo nuevo pero había uno antiguo, eliminar el archivo antiguo
                         $this->deleteFile($existingFileUrl);
                         $newGridItem['props']['file']['url'] = null;
-                    }
+                    } */
                 }
             }
 
