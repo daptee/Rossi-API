@@ -346,6 +346,7 @@ class ProductController extends Controller
                'sillon', 'Sillon', 'SILLON', 
                'sillones', 'Sillones', 'SILLONES',
                'tándem', 'Tándem', 'TÁNDEM',
+               'tndem', 'tndem', 'tndem',
                'tándems', 'Tándems', 'TÁNDEMS',
                'operativa', 'Operativa', 'OPERATIVA',
                'operativas', 'Operativas', 'OPERATIVAS',
