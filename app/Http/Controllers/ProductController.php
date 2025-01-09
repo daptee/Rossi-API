@@ -277,112 +277,90 @@ class ProductController extends Controller
     }
 
     public function skuProduct($sku)
-    {
-        try {
-            Log::info($sku);
+{
+    try {
+        Log::info($sku);
 
-            // Consulta el producto con todas las relaciones necesarias
-            $product = Product::with([
-                'categories',
-                'materials.material',
-                'attributes.attribute',
-                'gallery',
-                'components'
-            ])
-                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'sub_img', 'main_video', 'file_data_sheet', 'status', 'featured')
-                ->where('sku', $sku)
-                ->firstOrFail();
+        // Consulta el producto con todas las relaciones necesarias
+        $product = Product::with([
+            'categories',
+            'materials.material',
+            'attributes.attribute',
+            'gallery',
+            'components'
+        ])
+            ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'sub_img', 'main_video', 'file_data_sheet', 'status', 'featured')
+            ->where('sku', $sku)
+            ->firstOrFail();
 
-            // Limpia los datos del pivot para cada relación
-            $product->categories->each(function ($category) {
-                unset($category->pivot);
-            });
+        // Limpia los datos del pivot para cada relación
+        $product->categories->each(function ($category) {
+            unset($category->pivot);
+        });
 
-            $product->materials->each(function ($material) {
-                $material->img_value = $material->pivot->img;
-                unset($material->pivot);
-            });
+        $product->materials->each(function ($material) {
+            $material->img_value = $material->pivot->img;
+            unset($material->pivot);
+        });
 
-            $product->attributes->each(function ($attribute) {
-                $attribute->img = $attribute->pivot->img;
-                unset($attribute->pivot);
-            });
+        $product->attributes->each(function ($attribute) {
+            $attribute->img = $attribute->pivot->img;
+            unset($attribute->pivot);
+        });
 
-            $product->components->each(function ($component) {
-                unset($component->pivot);
-            });
+        $product->components->each(function ($component) {
+            unset($component->pivot);
+        });
 
-            // Obtener el nombre del estado del producto desde la tabla product_status
-            $status = ProductStatus::find($product->status);
+        // Obtener el nombre del estado del producto desde la tabla product_status
+        $status = ProductStatus::find($product->status);
 
-            if ($status) {
-                $product->status = [
-                    'id' => $status->id,
-                    'status_name' => $status->status_name
-                ];
-            } else {
-                $product->status = [
-                    'id' => $product->status,
-                    'status_name' => 'Unknown'
-                ];
-            }
-
-            // Palabras a ignorar en la búsqueda
-            $ignoreWords = [
-               'silla', 'Silla', 'SILLA', 
-               'sillas', 'Sillas', 'SILLAS', 
-               'mesa', 'Mesa', 'MESA', 
-               'mesas', 'Mesas', 'MESAS', 
-               'escritorio', 'Escritorio', 'ESCRITORIO', 
-               'escritorios', 'Escritorios', 'ESCRITORIOS',
-               'taburete', 'Taburete', 'TABURETE', 
-               'taburetes', 'Taburetes', 'TABURETES', 
-               'wood', 'Wood', 'WOOD', 
-               'woods', 'Woods', 'WOODS', 
-               'tapizada', 'Tapizada', 'TAPIZADA', 
-               'tapizadas', 'Tapizadas', 'TAPIZADAS', 
-               'neumática', 'Neumática', 'NEUMÁTICA', 
-               'neumáticas', 'Neumáticas', 'NEUMÁTICAS', 
-               'sillon', 'Sillon', 'SILLON', 
-               'sillones', 'Sillones', 'SILLONES',
-               'tándem', 'Tándem', 'TÁNDEM',
-               'tndem', 'tndem', 'tndem',
-               'tándems', 'Tándems', 'TÁNDEMS',
-               'operativa', 'Operativa', 'OPERATIVA',
-               'operativas', 'Operativas', 'OPERATIVAS',
-               'ejecutiva', 'Ejecutiva', 'EJECUTIVA',
-               'ejecutivas', 'Ejecutivas', 'EJECUTIVAS',
-               'gerencial', 'Gerencial', 'GERENCIAL',
-               'gerenciales', 'Gerenciales', 'GERENCIALES',
-               'componente', 'Componente', 'COMPONENTE',
-               'componentes', 'Componentes', 'COMPONENTES',
-               'escolares', 'Escolares', 'ESCOLARES',
+        if ($status) {
+            $product->status = [
+                'id' => $status->id,
+                'status_name' => $status->status_name
             ];
-
-            // Separar el nombre del producto principal en palabras y filtrar las ignoradas
-            $productNameWords = collect(explode(' ', $product->name))
-                ->reject(fn($word) => in_array(strtolower($word), $ignoreWords))
-                ->values();
-
-            // Buscar productos relacionados que contengan alguna de las palabras exactas
-            $relatedProducts = Product::select('id', 'name', 'slug', 'sku', 'main_img')
-                ->where(function ($query) use ($productNameWords) {
-                    foreach ($productNameWords as $word) {
-                        $query->orWhereRaw('name REGEXP ?', ["\\b" . preg_quote($word) . "\\b"]);
-                    }
-                })
-                ->where('id', '!=', $product->id) // Excluir el producto principal
-                ->get();
-
-            // Agregar los productos relacionados al array principal
-            $product->products = $relatedProducts;
-
-            return ApiResponse::create('Succeeded', 200, $product);
-        } catch (Exception $e) {
-            return ApiResponse::create('Error al obtener el producto', 500, ['error' => $e->getMessage()]);
+        } else {
+            $product->status = [
+                'id' => $product->status,
+                'status_name' => 'Unknown'
+            ];
         }
-    }
 
+        // Lista de palabras a ignorar, convertidas a minúsculas
+        $ignoreWords = collect([
+            'silla', 'sillas', 'mesa', 'mesas', 'escritorio', 'escritorios',
+            'taburete', 'taburetes', 'wood', 'woods', 'tapizada', 'tapizadas',
+            'neumática', 'neumáticas', 'sillon', 'sillones', 'tándem', 'tndem',
+            'tándems', 'operativa', 'operativas', 'ejecutiva', 'ejecutivas',
+            'gerencial', 'gerenciales', 'componente', 'componentes', 'escolares'
+        ])->map(fn($word) => strtolower($word))->toArray();
+
+        // Separar el nombre del producto principal en palabras y filtrar las ignoradas
+        $productNameWords = collect(explode(' ', strtolower($product->name)))
+            ->reject(fn($word) => in_array($word, $ignoreWords))
+            ->values();
+
+        Log::info('Palabras filtradas:', $productNameWords->toArray());
+
+        // Buscar productos relacionados que contengan alguna de las palabras filtradas
+        $relatedProducts = Product::select('id', 'name', 'slug', 'sku', 'main_img')
+            ->where(function ($query) use ($productNameWords) {
+                foreach ($productNameWords as $word) {
+                    $query->orWhereRaw('name REGEXP ?', ["\\b" . preg_quote($word) . "\\b"]);
+                }
+            })
+            ->where('id', '!=', $product->id) // Excluir el producto principal
+            ->get();
+
+        // Agregar los productos relacionados al producto principal
+        $product->products = $relatedProducts;
+
+        return ApiResponse::create('Succeeded', 200, $product);
+    } catch (Exception $e) {
+        return ApiResponse::create('Error al obtener el producto', 500, ['error' => $e->getMessage()]);
+    }
+}
 
     // POST - Crear un nuevo producto
     public function store(Request $request)
