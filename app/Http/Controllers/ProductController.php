@@ -327,36 +327,39 @@ class ProductController extends Controller
             ];
         }
 
-        // Lista de palabras a ignorar
+        // Palabras a ignorar
         $ignoreWords = collect([
             'silla', 'sillas', 'mesa', 'mesas', 'escritorio', 'escritorios',
             'taburete', 'taburetes', 'wood', 'woods', 'tapizada', 'tapizadas',
             'neumática', 'neumáticas', 'sillon', 'sillones', 'tándem', 'tndem',
             'tándems', 'operativa', 'operativas', 'ejecutiva', 'ejecutivas',
             'gerencial', 'gerenciales', 'componente', 'componentes', 'escolares'
-        ])
-        ->map(fn($word) => $this->normalizeString($word))
-        ->toArray();
+        ])->map(fn($word) => $this->normalizeString($word));
 
         // Normalizar el nombre del producto y separarlo en palabras
         $productNameWords = collect(explode(' ', $this->normalizeString($product->name)))
-            ->reject(fn($word) => in_array($word, $ignoreWords))
+            ->reject(fn($word) => $ignoreWords->contains($word))
             ->values();
 
         Log::info('Palabras filtradas:', $productNameWords->toArray());
 
-        // Buscar productos relacionados que contengan alguna de las palabras filtradas
-        $relatedProducts = Product::select('id', 'name', 'slug', 'sku', 'main_img')
-            ->where(function ($query) use ($productNameWords) {
-                foreach ($productNameWords as $word) {
-                    $query->orWhereRaw('name REGEXP ?', ["\\b" . preg_quote($word) . "\\b"]);
-                }
-            })
-            ->where('id', '!=', $product->id) // Excluir el producto principal
-            ->get();
+        if ($productNameWords->isEmpty()) {
+            // Si no quedan palabras útiles, evitar consultas vacías
+            $product->products = [];
+        } else {
+            // Buscar productos relacionados que contengan alguna de las palabras filtradas
+            $relatedProducts = Product::select('id', 'name', 'slug', 'sku', 'main_img')
+                ->where(function ($query) use ($productNameWords) {
+                    foreach ($productNameWords as $word) {
+                        $query->orWhereRaw('LOWER(name) REGEXP ?', ["\\b" . preg_quote($word) . "\\b"]);
+                    }
+                })
+                ->where('id', '!=', $product->id) // Excluir el producto principal
+                ->get();
 
-        // Agregar los productos relacionados al producto principal
-        $product->products = $relatedProducts;
+            // Agregar los productos relacionados al producto principal
+            $product->products = $relatedProducts;
+        }
 
         return ApiResponse::create('Succeeded', 200, $product);
     } catch (Exception $e) {
@@ -369,7 +372,15 @@ class ProductController extends Controller
  */
 private function normalizeString($string)
 {
-    return strtolower(preg_replace('/[^a-z0-9]/', '', iconv('UTF-8', 'ASCII//TRANSLIT', $string)));
+    $normalized = strtolower($string);
+    $normalized = str_replace(
+        ['á', 'é', 'í', 'ó', 'ú', 'ñ', 'ü'],
+        ['a', 'e', 'i', 'o', 'u', 'n', 'u'],
+        $normalized
+    );
+
+    // Mantener solo caracteres alfanuméricos y espacios
+    return preg_replace('/[^a-z0-9\s]/', '', $normalized);
 }
 
     // POST - Crear un nuevo producto
