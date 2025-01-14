@@ -275,113 +275,114 @@ class ProductController extends Controller
             return ApiResponse::create('Error al obtener el producto', 500, ['error' => $e->getMessage()]);
         }
     }
-        
+
     public function skuProduct($sku)
-{
-    try {
-        Log::info($sku);
+    {
+        try {
+            Log::info($sku);
 
-        // Consulta el producto con todas las relaciones necesarias
-        $product = Product::with([
-            'categories',
-            'materials.material',
-            'attributes.attribute',
-            'gallery',
-            'components'
-        ])
-            ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'sub_img', 'main_video', 'file_data_sheet', 'status', 'featured')
-            ->where('sku', $sku)
-            ->firstOrFail();
+            // Consulta el producto con todas las relaciones necesarias
+            $product = Product::with([
+                'categories',
+                'materials.material',
+                'attributes.attribute',
+                'gallery',
+                'components'
+            ])
+                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'sub_img', 'main_video', 'file_data_sheet', 'status', 'featured')
+                ->where('sku', $sku)
+                ->firstOrFail();
 
-        // Limpia los datos del pivot para cada relación
-        $product->categories->each(function ($category) {
-            unset($category->pivot);
-        });
+            // Limpia los datos del pivot para cada relación
+            $product->categories->each(function ($category) {
+                unset($category->pivot);
+            });
 
-        $product->materials->each(function ($material) {
-            $material->img_value = $material->pivot->img;
-            unset($material->pivot);
-        });
+            $product->materials->each(function ($material) {
+                $material->img_value = $material->pivot->img;
+                unset($material->pivot);
+            });
 
-        $product->attributes->each(function ($attribute) {
-            $attribute->img = $attribute->pivot->img;
-            unset($attribute->pivot);
-        });
+            $product->attributes->each(function ($attribute) {
+                $attribute->img = $attribute->pivot->img;
+                unset($attribute->pivot);
+            });
 
-        $product->components->each(function ($component) {
-            unset($component->pivot);
-        });
+            $product->components->each(function ($component) {
+                unset($component->pivot);
+            });
 
-        // Obtener el nombre del estado del producto desde la tabla product_status
-        $status = ProductStatus::find($product->status);
+            // Obtener el nombre del estado del producto desde la tabla product_status
+            $status = ProductStatus::find($product->status);
 
-        if ($status) {
-            $product->status = [
-                'id' => $status->id,
-                'status_name' => $status->status_name
-            ];
-        } else {
-            $product->status = [
-                'id' => $product->status,
-                'status_name' => 'Unknown'
-            ];
+            if ($status) {
+                $product->status = [
+                    'id' => $status->id,
+                    'status_name' => $status->status_name
+                ];
+            } else {
+                $product->status = [
+                    'id' => $product->status,
+                    'status_name' => 'Unknown'
+                ];
+            }
+
+            // Palabras a ignorar
+            $ignoreWords = collect([
+                'silla', 'sillas', 'mesa', 'mesas', 'escritorio', 'escritorios',
+                'taburete', 'taburetes', 'wood', 'woods', 'tapizada', 'tapizadas',
+                'neumática', 'neumáticas', 'sillon', 'sillones', 'tándem', 'tndem',
+                'tándems', 'operativa', 'operativas', 'ejecutiva', 'ejecutivas',
+                'gerencial', 'gerenciales', 'componente', 'componentes', 'escolares', 'tapizado', 'tapizados'
+            ])->map(fn($word) => $this->normalizeString($word));
+
+            // Normalizar el nombre del producto y separarlo en palabras
+            $productNameWords = collect(explode(' ', $this->normalizeString($product->name)))
+                ->reject(fn($word) => $ignoreWords->contains($word))
+                ->values();
+
+            Log::info('Palabras filtradas:', $productNameWords->toArray());
+
+            if ($productNameWords->isEmpty()) {
+                // Si no quedan palabras útiles, evitar consultas vacías
+                $product->products = [];
+            } else {
+                // Buscar productos relacionados que contengan alguna de las palabras filtradas
+                $relatedProducts = Product::select('id', 'name', 'slug', 'sku', 'main_img')
+                    ->where(function ($query) use ($productNameWords) {
+                        foreach ($productNameWords as $word) {
+                            $query->orWhereRaw('LOWER(name) REGEXP ?', ["\\b" . preg_quote($word) . "\\b"]);
+                        }
+                    })
+                    ->where('id', '!=', $product->id) // Excluir el producto principal
+                    ->orderBy('name', 'asc') // Ordenar alfabéticamente
+                    ->get();
+
+                // Agregar los productos relacionados al producto principal
+                $product->products = $relatedProducts;
+            }
+
+            return ApiResponse::create('Succeeded', 200, $product);
+        } catch (Exception $e) {
+            return ApiResponse::create('Error al obtener el producto', 500, ['error' => $e->getMessage()]);
         }
-
-        // Palabras a ignorar
-        $ignoreWords = collect([
-            'silla', 'sillas', 'mesa', 'mesas', 'escritorio', 'escritorios',
-            'taburete', 'taburetes', 'wood', 'woods', 'tapizada', 'tapizadas',
-            'neumática', 'neumáticas', 'sillon', 'sillones', 'tándem', 'tndem',
-            'tándems', 'operativa', 'operativas', 'ejecutiva', 'ejecutivas',
-            'gerencial', 'gerenciales', 'componente', 'componentes', 'escolares', 'tapizado', 'tapizados'
-        ])->map(fn($word) => $this->normalizeString($word));
-
-        // Normalizar el nombre del producto y separarlo en palabras
-        $productNameWords = collect(explode(' ', $this->normalizeString($product->name)))
-            ->reject(fn($word) => $ignoreWords->contains($word))
-            ->values();
-
-        Log::info('Palabras filtradas:', $productNameWords->toArray());
-
-        if ($productNameWords->isEmpty()) {
-            // Si no quedan palabras útiles, evitar consultas vacías
-            $product->products = [];
-        } else {
-            // Buscar productos relacionados que contengan alguna de las palabras filtradas
-            $relatedProducts = Product::select('id', 'name', 'slug', 'sku', 'main_img')
-                ->where(function ($query) use ($productNameWords) {
-                    foreach ($productNameWords as $word) {
-                        $query->orWhereRaw('LOWER(name) REGEXP ?', ["\\b" . preg_quote($word) . "\\b"]);
-                    }
-                })
-                ->where('id', '!=', $product->id) // Excluir el producto principal
-                ->get();
-
-            // Agregar los productos relacionados al producto principal
-            $product->products = $relatedProducts;
-        }
-
-        return ApiResponse::create('Succeeded', 200, $product);
-    } catch (Exception $e) {
-        return ApiResponse::create('Error al obtener el producto', 500, ['error' => $e->getMessage()]);
     }
-}
 
-/**
- * Función para normalizar cadenas eliminando acentos y caracteres especiales.
- */
-private function normalizeString($string)
-{
-    $normalized = strtolower($string);
-    $normalized = str_replace(
-        ['á', 'é', 'í', 'ó', 'ú', 'ñ', 'ü'],
-        ['a', 'e', 'i', 'o', 'u', 'n', 'u'],
-        $normalized
-    );
+    /**
+     * Función para normalizar cadenas eliminando acentos y caracteres especiales.
+     */
+    private function normalizeString($string)
+    {
+        $normalized = strtolower($string);
+        $normalized = str_replace(
+            ['á', 'é', 'í', 'ó', 'ú', 'ñ', 'ü'],
+            ['a', 'e', 'i', 'o', 'u', 'n', 'u'],
+            $normalized
+        );
 
-    // Mantener solo caracteres alfanuméricos y espacios
-    return preg_replace('/[^a-z0-9\s]/', '', $normalized);
-}
+        // Mantener solo caracteres alfanuméricos y espacios
+        return preg_replace('/[^a-z0-9\s]/', '', $normalized);
+    }
 
     // POST - Crear un nuevo producto
     public function store(Request $request)

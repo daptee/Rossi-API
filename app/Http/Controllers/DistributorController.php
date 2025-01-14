@@ -22,7 +22,8 @@ class DistributorController extends Controller
 
             // Consulta inicial
             $query = Distributor::query()
-                ->with(['province', 'locality', 'status']);
+                ->with(['province', 'locality', 'status'])
+                ->orderBy('name', 'asc'); // Ordenar alfabéticamente
 
             // Filtrar por estado si el parámetro está presente
             if ($status !== null) {
@@ -166,7 +167,7 @@ class DistributorController extends Controller
             return ApiResponse::create('Error al actualizar un distribuidor', 500, ['error' => $e->getMessage()]);
         }
     }
-    
+
     public function destroy($id)
     {
         try {
