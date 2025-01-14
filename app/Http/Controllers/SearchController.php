@@ -33,72 +33,73 @@ class SearchController extends Controller
 
             // Categorías con búsqueda en los hijos
             if ($filters['category'] == 1) {
-                $query = Category::with(['status'])
+                $query = Category::with([
+                    'categories' => function ($query) use ($search) {
+                        if ($search) {
+                            // Subcategorías coincidentes con la búsqueda
+                            $query->where('category', 'like', '%' . $search . '%');
+                        }
+                    },
+                    'status'
+                ])
                     ->withCount('products');
 
                 if ($search) {
+                    // Padres que coincidan directamente o cuyos hijos coincidan
                     $query->where('category', 'like', '%' . $search . '%')
                         ->orWhereHas('categories', function ($childQuery) use ($search) {
                             $childQuery->where('category', 'like', '%' . $search . '%');
                         });
                 }
 
-                $categories = $query->get();
-
-                // Filtrar resultados para solo incluir categorías específicas e incluir padre/hijos relevantes
-                $result['categories'] = $categories->map(function ($category) {
-                    return $category->load([
-                        'categories' => function ($query) use ($category) {
-                            $query->where('id', $category->id); // Incluir solo los hijos relevantes
-                        }
-                    ]);
-                });
+                $result['categories'] = $query->get();
             }
 
             // Componentes con búsqueda en los hijos
             if ($filters['component'] == 1) {
-                $query = Component::with(['status']);
+                $query = Component::with([
+                    'components' => function ($query) use ($search) {
+                        if ($search) {
+                            // Subcomponentes coincidentes con la búsqueda
+                            $query->where('name', 'like', '%' . $search . '%');
+                        }
+                    },
+                    'status'
+                ]);
 
                 if ($search) {
+                    // Padres que coincidan directamente o cuyos hijos coincidan
                     $query->where('name', 'like', '%' . $search . '%')
                         ->orWhereHas('components', function ($childQuery) use ($search) {
                             $childQuery->where('name', 'like', '%' . $search . '%');
                         });
                 }
 
-                $components = $query->get();
-
-                // Filtrar resultados para componentes relevantes
-                $result['components'] = $components->map(function ($component) {
-                    return $component->load([
-                        'components' => function ($query) use ($component) {
-                            $query->where('id', $component->id); // Incluir solo los hijos relevantes
-                        }
-                    ]);
-                });
+                $result['components'] = $query->get();
             }
 
             // Materiales con búsqueda en los hijos
             if ($filters['material'] == 1) {
-                $query = Material::with(['status', 'values', 'submaterials']);
+                $query = Material::with([
+                    'submaterials' => function ($query) use ($search) {
+                        if ($search) {
+                            // Submateriales coincidentes con la búsqueda
+                            $query->where('name', 'like', '%' . $search . '%');
+                        }
+                    },
+                    'status',
+                    'values'
+                ]);
 
                 if ($search) {
+                    // Padres que coincidan directamente o cuyos hijos coincidan
                     $query->where('name', 'like', '%' . $search . '%')
                         ->orWhereHas('submaterials', function ($childQuery) use ($search) {
                             $childQuery->where('name', 'like', '%' . $search . '%');
                         });
                 }
 
-                $materials = $query->get();
-
-                // Filtrar resultados para materiales relevantes
-                $result['materials'] = $materials->map(function ($material) {
-                    return $material->load([
-                        'submaterials' => function ($query) use ($material) {
-                            $query->where('id', $material->id); // Incluir solo los submateriales relevantes
-                        }
-                    ]);
-                });
+                $result['materials'] = $query->get();
             }
 
             if ($filters['attribute'] == 1) {
