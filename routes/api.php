@@ -6,6 +6,7 @@
  use App\Http\Controllers\DistributorController;
  use App\Http\Controllers\ProductController;
  use App\Http\Controllers\ProvinceController;
+ use App\Http\Controllers\SearchController;
  use App\Http\Controllers\WebContentAboutController;
  use App\Http\Controllers\WebContentHomeController;
  use Illuminate\Support\Facades\Route;
@@ -122,4 +123,11 @@ Route::group([
     'prefix' => 'provinces'
 ], function () {
     Route::get('/', [ProvinceController::class, 'index']);
+});
+
+Route::group([
+    'middleware' => 'api',
+    'prefix' => 'search'
+], function () {
+    Route::get('/', [SearchController::class, 'index']);
 });

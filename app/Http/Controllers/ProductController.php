@@ -327,54 +327,40 @@ class ProductController extends Controller
                 ];
             }
 
-            // Palabras a ignorar en la búsqueda
-            $ignoreWords = [
-               'silla', 'Silla', 'SILLA', 
-               'sillas', 'Sillas', 'SILLAS', 
-               'mesa', 'Mesa', 'MESA', 
-               'mesas', 'Mesas', 'MESAS', 
-               'escritorio', 'Escritorio', 'ESCRITORIO', 
-               'escritorios', 'Escritorios', 'ESCRITORIOS',
-               'taburete', 'Taburete', 'TABURETE', 
-               'taburetes', 'Taburetes', 'TABURETES', 
-               'wood', 'Wood', 'WOOD', 
-               'woods', 'Woods', 'WOODS', 
-               'tapizada', 'Tapizada', 'TAPIZADA', 
-               'tapizadas', 'Tapizadas', 'TAPIZADAS', 
-               'neumática', 'Neumática', 'NEUMÁTICA', 
-               'neumáticas', 'Neumáticas', 'NEUMÁTICAS', 
-               'sillon', 'Sillon', 'SILLON', 
-               'sillones', 'Sillones', 'SILLONES',
-               'tándem', 'Tándem', 'TÁNDEM',
-               'tándems', 'Tándems', 'TÁNDEMS',
-               'operativa', 'Operativa', 'OPERATIVA',
-               'operativas', 'Operativas', 'OPERATIVAS',
-               'ejecutiva', 'Ejecutiva', 'EJECUTIVA',
-               'ejecutivas', 'Ejecutivas', 'EJECUTIVAS',
-               'gerencial', 'Gerencial', 'GERENCIAL',
-               'gerenciales', 'Gerenciales', 'GERENCIALES',
-               'componente', 'Componente', 'COMPONENTE',
-               'componentes', 'Componentes', 'COMPONENTES',
-               'escolares', 'Escolares', 'ESCOLARES',
-            ];
+            // Palabras a ignorar
+            $ignoreWords = collect([
+                'silla', 'sillas', 'mesa', 'mesas', 'escritorio', 'escritorios',
+                'taburete', 'taburetes', 'wood', 'woods', 'tapizada', 'tapizadas',
+                'neumática', 'neumáticas', 'sillon', 'sillones', 'tándem', 'tndem',
+                'tándems', 'operativa', 'operativas', 'ejecutiva', 'ejecutivas',
+                'gerencial', 'gerenciales', 'componente', 'componentes', 'escolares', 'tapizado', 'tapizados'
+            ])->map(fn($word) => $this->normalizeString($word));
 
-            // Separar el nombre del producto principal en palabras y filtrar las ignoradas
-            $productNameWords = collect(explode(' ', $product->name))
-                ->reject(fn($word) => in_array(strtolower($word), $ignoreWords))
+            // Normalizar el nombre del producto y separarlo en palabras
+            $productNameWords = collect(explode(' ', $this->normalizeString($product->name)))
+                ->reject(fn($word) => $ignoreWords->contains($word))
                 ->values();
 
-            // Buscar productos relacionados que contengan alguna de las palabras exactas
-            $relatedProducts = Product::select('id', 'name', 'slug', 'sku', 'main_img')
-                ->where(function ($query) use ($productNameWords) {
-                    foreach ($productNameWords as $word) {
-                        $query->orWhereRaw('name REGEXP ?', ["\\b" . preg_quote($word) . "\\b"]);
-                    }
-                })
-                ->where('id', '!=', $product->id) // Excluir el producto principal
-                ->get();
+            Log::info('Palabras filtradas:', $productNameWords->toArray());
 
-            // Agregar los productos relacionados al array principal
-            $product->products = $relatedProducts;
+            if ($productNameWords->isEmpty()) {
+                // Si no quedan palabras útiles, evitar consultas vacías
+                $product->products = [];
+            } else {
+                // Buscar productos relacionados que contengan alguna de las palabras filtradas
+                $relatedProducts = Product::select('id', 'name', 'slug', 'sku', 'main_img')
+                    ->where(function ($query) use ($productNameWords) {
+                        foreach ($productNameWords as $word) {
+                            $query->orWhereRaw('LOWER(name) REGEXP ?', ["\\b" . preg_quote($word) . "\\b"]);
+                        }
+                    })
+                    ->where('id', '!=', $product->id) // Excluir el producto principal
+                    ->orderBy('name', 'asc') // Ordenar alfabéticamente
+                    ->get();
+
+                // Agregar los productos relacionados al producto principal
+                $product->products = $relatedProducts;
+            }
 
             return ApiResponse::create('Succeeded', 200, $product);
         } catch (Exception $e) {
@@ -382,6 +368,21 @@ class ProductController extends Controller
         }
     }
 
+    /**
+     * Función para normalizar cadenas eliminando acentos y caracteres especiales.
+     */
+    private function normalizeString($string)
+    {
+        $normalized = strtolower($string);
+        $normalized = str_replace(
+            ['á', 'é', 'í', 'ó', 'ú', 'ñ', 'ü'],
+            ['a', 'e', 'i', 'o', 'u', 'n', 'u'],
+            $normalized
+        );
+
+        // Mantener solo caracteres alfanuméricos y espacios
+        return preg_replace('/[^a-z0-9\s]/', '', $normalized);
+    }
 
     // POST - Crear un nuevo producto
     public function store(Request $request)

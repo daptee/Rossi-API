@@ -34,13 +34,16 @@ class MaterialController extends Controller
             // Verificar si se debe aplicar paginación o devolver todos los registros
             if ($perPage !== null) {
                 $materials = $query->paginate((int) $perPage); // Aplicar paginación
+                $materialsData = $materials->map(function ($material) {
+                    return $this->buildTree([$material])->first(); // Construir el árbol jerárquico
+                }); // Aplicar paginación
                 $metaData = [
                     'page' => $materials->currentPage(),
                     'per_page' => $materials->perPage(),
                     'total' => $materials->total(),
                     'last_page' => $materials->lastPage(),
                 ];
-                $data = $materials->items();
+                $data = $materialsData;
             } else {
                 $materialsCollection = $query->get(); // Obtener todos los registros
                 $materialsCollection = $materialsCollection->map(function ($material) {
