@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Responses\ApiResponse;
+use App\Models\Attribute;
 use App\Models\Category;
 use App\Models\Component;
 use App\Models\Material;
@@ -24,55 +25,115 @@ class SearchController extends Controller
                 'component' => $request->query('component', 0),
                 'material' => $request->query('material', 0),
                 'product' => $request->query('product', 0),
+                'attribute' => $request->query('attribute', 0),
             ];
 
             // Resultado combinado
             $result = [];
 
-            // Categorías
+            // Categorías con búsqueda en los hijos
             if ($filters['category'] == 1) {
-                $query = Category::with(['categories', 'status'])
-                    ->withCount('products')
-                    ->whereNull('id_category');
+                $query = Category::with(['status'])
+                    ->withCount('products');
 
                 if ($search) {
-                    $query->where('category', 'like', '%' . $search . '%');
+                    $query->where('category', 'like', '%' . $search . '%')
+                        ->orWhereHas('categories', function ($childQuery) use ($search) {
+                            $childQuery->where('category', 'like', '%' . $search . '%');
+                        });
                 }
 
-                $result['categories'] = $query->get();
+                $categories = $query->get();
+
+                // Filtrar resultados para solo incluir categorías específicas e incluir padre/hijos relevantes
+                $result['categories'] = $categories->map(function ($category) {
+                    return $category->load([
+                        'categories' => function ($query) use ($category) {
+                            $query->where('id', $category->id); // Incluir solo los hijos relevantes
+                        }
+                    ]);
+                });
             }
 
-            // Componentes
+            // Componentes con búsqueda en los hijos
             if ($filters['component'] == 1) {
-                $query = Component::with([
-                    'status',
-                    'components' => function ($query) {
-                        $query->with('status');
-                    }
-                ])->whereNull('id_component');
+                $query = Component::with(['status']);
 
                 if ($search) {
-                    $query->where('name', 'like', '%' . $search . '%');
+                    $query->where('name', 'like', '%' . $search . '%')
+                        ->orWhereHas('components', function ($childQuery) use ($search) {
+                            $childQuery->where('name', 'like', '%' . $search . '%');
+                        });
                 }
 
-                $result['components'] = $query->get();
+                $components = $query->get();
+
+                // Filtrar resultados para componentes relevantes
+                $result['components'] = $components->map(function ($component) {
+                    return $component->load([
+                        'components' => function ($query) use ($component) {
+                            $query->where('id', $component->id); // Incluir solo los hijos relevantes
+                        }
+                    ]);
+                });
             }
 
-            // Materiales
+            // Materiales con búsqueda en los hijos
             if ($filters['material'] == 1) {
-                $query = Material::with('values', 'status')
-                    ->whereNull('id_material');
+                $query = Material::with(['status', 'values', 'submaterials']);
 
                 if ($search) {
-                    $query->where('name', 'like', '%' . $search . '%');
+                    $query->where('name', 'like', '%' . $search . '%')
+                        ->orWhereHas('submaterials', function ($childQuery) use ($search) {
+                            $childQuery->where('name', 'like', '%' . $search . '%');
+                        });
                 }
 
-                $result['materials'] = $query->get();
+                $materials = $query->get();
+
+                // Filtrar resultados para materiales relevantes
+                $result['materials'] = $materials->map(function ($material) {
+                    return $material->load([
+                        'submaterials' => function ($query) use ($material) {
+                            $query->where('id', $material->id); // Incluir solo los submateriales relevantes
+                        }
+                    ]);
+                });
             }
 
-            // Productos
+            if ($filters['attribute'] == 1) {
+                $query = Attribute::with([
+                    'values',
+                    'status',
+                    'attributes' => function ($query) {
+                        $query->with('status'); // Hijos de atributos
+                    }
+                ])->whereNull('id_attribute');
+
+                if ($search) {
+                    $query->where('name', 'like', '%' . $search . '%')
+                        ->orWhereHas('attributes', function ($childQuery) use ($search) {
+                            $childQuery->where('name', 'like', '%' . $search . '%');
+                        });
+                }
+
+                $result['attributes'] = $query->get();
+            }
+
+            // Productos sin cambios en la lógica
             if ($filters['product'] == 1) {
-                $query = Product::select('products.id', 'products.name', 'products.main_img', 'products.sub_img', 'products.status', 'products.featured', 'product_status.status_name', 'products.sku', 'products.slug', 'products.created_at')
+                $query = Product::select(
+                    'products.id',
+                    'products.name',
+                    'products.main_img',
+                    'products.sub_img',
+                    'products.status',
+                    'products.featured',
+                    'product_status.status_name',
+                    'products.sku',
+                    'products.slug',
+                    'products.created_at'
+                )
                     ->join('product_status', 'products.status', '=', 'product_status.id')
                     ->with(['categories.parent', 'materials', 'attributes', 'gallery', 'components'])
                     ->withCount(['categories', 'materials', 'attributes', 'gallery', 'components']);
@@ -90,6 +151,5 @@ class SearchController extends Controller
             return ApiResponse::create('Error en la búsqueda combinada', 500, [], ['error' => $e->getMessage()]);
         }
     }
-
 
 }
