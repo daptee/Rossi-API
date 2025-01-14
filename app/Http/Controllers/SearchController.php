@@ -10,6 +10,7 @@ use App\Models\Material;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Exception;
+use Log;
 
 class SearchController extends Controller
 {
@@ -78,29 +79,70 @@ class SearchController extends Controller
                 $result['components'] = $query->get();
             }
 
-            // Materiales con búsqueda en los hijos
             if ($filters['material'] == 1) {
-                $query = Material::with([
-                    'submaterials' => function ($query) use ($search) {
-                        if ($search) {
-                            // Submateriales coincidentes con la búsqueda
-                            $query->where('name', 'like', '%' . $search . '%');
-                        }
-                    },
-                    'status',
-                    'values'
-                ]);
+                $results = [];
 
-                if ($search) {
-                    // Padres que coincidan directamente o cuyos hijos coincidan
-                    $query->where('name', 'like', '%' . $search . '%')
-                        ->orWhereHas('submaterials', function ($childQuery) use ($search) {
-                            $childQuery->where('name', 'like', '%' . $search . '%');
-                        });
+                // Buscar el submaterial que coincide con el término
+                $matchingSubmaterials = Material::whereHas('submaterials', function ($query) use ($search) {
+                    $query->where('name', 'like', '%' . $search . '%');
+                })->with([
+                            'submaterials' => function ($query) use ($search) {
+                                $query->where('name', 'like', '%' . $search . '%'); // Solo submateriales coincidentes
+                            },
+                            'status',
+                            'values'
+                        ])->get();
+
+                // Construir un nuevo array desde cero para submateriales
+                $submaterialIds = []; // Array para almacenar los IDs de los submateriales procesados
+
+                foreach ($matchingSubmaterials as $material) {
+                    $results[] = [
+                        'id' => $material->id,
+                        'name' => $material->name,
+                        'status' => $material->status, // Información del material padre
+                        'values' => $material->values,
+                        'submaterials' => $material->submaterials->map(function ($submaterial) use (&$submaterialIds) {
+                            $submaterialIds[] = $submaterial->id; // Registrar el ID del submaterial
+                            return [
+                                'id' => $submaterial->id,
+                                'name' => $submaterial->name,
+                                'status' => $submaterial->status, // Información del submaterial
+                                'values' => $submaterial->values,
+                            ];
+                        })->toArray(),
+                    ];
                 }
 
-                $result['materials'] = $query->get();
+                // Incluir materiales independientes que coincidan con la búsqueda, pero no estén en submateriales
+                $independentMaterials = Material::where('name', 'like', '%' . $search . '%')
+                    ->whereNotIn('id', $submaterialIds) // Excluir los submateriales ya listados
+                    ->with(['status', 'values'])
+                    ->get()
+                    ->map(function ($material) {
+                        return [
+                            'id' => $material->id,
+                            'name' => $material->name,
+                            'status' => $material->status,
+                            'values' => $material->values,
+                            'submaterials' => $material->submaterials->map(function ($submaterial) {
+                                return [
+                                    'id' => $submaterial->id,
+                                    'name' => $submaterial->name,
+                                    'status' => $submaterial->status, // Información del submaterial
+                                    'values' => $submaterial->values,
+                                ];
+                            })->toArray(),// Vacío porque es independiente
+                        ];
+                    });
+
+                $results = array_merge($results, $independentMaterials->toArray());
+
+                $result['materials'] = $results;
             }
+
+
+
 
             if ($filters['attribute'] == 1) {
                 $query = Attribute::with([
