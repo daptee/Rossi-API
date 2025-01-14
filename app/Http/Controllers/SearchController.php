@@ -33,30 +33,31 @@ class SearchController extends Controller
 
             // Categorías con búsqueda en los hijos
             if ($filters['category'] == 1) {
-                $query = Category::with(['categories', 'status'])
-                    ->withCount('products')
-                    ->whereNull('id_category');
+                $query = Category::with(['status'])
+                    ->withCount('products');
 
                 if ($search) {
-                    $query->where(function ($q) use ($search) {
-                        $q->where('category', 'like', '%' . $search . '%')
-                            ->orWhereHas('categories', function ($childQuery) use ($search) {
-                                $childQuery->where('category', 'like', '%' . $search . '%');
-                            });
-                    });
+                    $query->where('category', 'like', '%' . $search . '%')
+                        ->orWhereHas('categories', function ($childQuery) use ($search) {
+                            $childQuery->where('category', 'like', '%' . $search . '%');
+                        });
                 }
 
-                $result['categories'] = $query->get();
+                $categories = $query->get();
+
+                // Filtrar resultados para solo incluir categorías específicas e incluir padre/hijos relevantes
+                $result['categories'] = $categories->map(function ($category) {
+                    return $category->load([
+                        'categories' => function ($query) use ($category) {
+                            $query->where('id', $category->id); // Incluir solo los hijos relevantes
+                        }
+                    ]);
+                });
             }
 
             // Componentes con búsqueda en los hijos
             if ($filters['component'] == 1) {
-                $query = Component::with([
-                    'status',
-                    'components' => function ($query) {
-                        $query->with('status'); // Hijos de componentes
-                    }
-                ])->whereNull('id_component');
+                $query = Component::with(['status']);
 
                 if ($search) {
                     $query->where('name', 'like', '%' . $search . '%')
@@ -65,13 +66,21 @@ class SearchController extends Controller
                         });
                 }
 
-                $result['components'] = $query->get();
+                $components = $query->get();
+
+                // Filtrar resultados para componentes relevantes
+                $result['components'] = $components->map(function ($component) {
+                    return $component->load([
+                        'components' => function ($query) use ($component) {
+                            $query->where('id', $component->id); // Incluir solo los hijos relevantes
+                        }
+                    ]);
+                });
             }
 
             // Materiales con búsqueda en los hijos
             if ($filters['material'] == 1) {
-                $query = Material::with(['values', 'status', 'submaterials'])
-                    ->whereNull('id_material');
+                $query = Material::with(['status', 'values', 'submaterials']);
 
                 if ($search) {
                     $query->where('name', 'like', '%' . $search . '%')
@@ -80,25 +89,34 @@ class SearchController extends Controller
                         });
                 }
 
-                $result['materials'] = $query->get();
+                $materials = $query->get();
+
+                // Filtrar resultados para materiales relevantes
+                $result['materials'] = $materials->map(function ($material) {
+                    return $material->load([
+                        'submaterials' => function ($query) use ($material) {
+                            $query->where('id', $material->id); // Incluir solo los submateriales relevantes
+                        }
+                    ]);
+                });
             }
 
             if ($filters['attribute'] == 1) {
                 $query = Attribute::with([
-                    'values', 
-                    'status', 
+                    'values',
+                    'status',
                     'attributes' => function ($query) {
                         $query->with('status'); // Hijos de atributos
                     }
                 ])->whereNull('id_attribute');
-    
+
                 if ($search) {
                     $query->where('name', 'like', '%' . $search . '%')
                         ->orWhereHas('attributes', function ($childQuery) use ($search) {
                             $childQuery->where('name', 'like', '%' . $search . '%');
                         });
                 }
-    
+
                 $result['attributes'] = $query->get();
             }
 
