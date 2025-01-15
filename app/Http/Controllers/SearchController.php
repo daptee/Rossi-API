@@ -10,6 +10,7 @@ use App\Models\Material;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Exception;
+use Log;
 
 class SearchController extends Controller
 {
@@ -33,72 +34,269 @@ class SearchController extends Controller
 
             // Categorías con búsqueda en los hijos
             if ($filters['category'] == 1) {
-                $query = Category::with(['status'])
-                    ->withCount('products');
+                $results = [];
 
-                if ($search) {
-                    $query->where('category', 'like', '%' . $search . '%')
-                        ->orWhereHas('categories', function ($childQuery) use ($search) {
-                            $childQuery->where('category', 'like', '%' . $search . '%');
-                        });
+                // Buscar las categorías principales y sus subcategorías coincidentes
+                $matchingCategories = Category::whereHas('categories', function ($query) use ($search) {
+                    $query->where('category', 'like', '%' . $search . '%');
+                })->with([
+                            'categories' => function ($query) use ($search) {
+                                $query->where('category', 'like', '%' . $search . '%'); // Subcategorías coincidentes
+                            },
+                            'status'
+                        ])->get();
+
+                $uniqueCategories = [];
+                $processedCategoryIds = [];
+
+                // Construir un array único para las categorías
+                foreach ($matchingCategories as $category) {
+                    $id = $category->id;
+                    if (!isset($uniqueCategories[$id])) {
+                        $uniqueCategories[$id] = [
+                            'id' => $category->id,
+                            'category' => $category->category,
+                            'status' => $category->status,
+                            'img' => $category->img,
+                            'sub_img' => $category->sub_img,
+                            'video' => $category->video,
+                            'icon' => $category->icon,
+                            'color' => $category->color,
+                            'grid' => $category->grid,
+                            'subcategories' => [], // Inicializamos el array de subcategorías
+                        ];
+                    }
+
+                    // Agregar las subcategorías únicas
+                    $uniqueCategories[$id]['subcategories'] = array_merge(
+                        $uniqueCategories[$id]['subcategories'],
+                        $category->categories->map(function ($subcategory) use ($category, &$processedCategoryIds) {
+                            if (!in_array($subcategory->id, $processedCategoryIds)) {
+                                $processedCategoryIds[] = $subcategory->id;
+                                return [
+                                    'id' => $subcategory->id,
+                                    'category' => $subcategory->category,
+                                    'parent_category' => $category->category,
+                                    'status' => $subcategory->status,
+                                    'img'=> $subcategory->img,
+                                    'sub_img'=> $subcategory->sub_img,
+                                    'video'=> $subcategory->video,
+                                    'icon'=> $subcategory->icon,
+                                    'color'=> $subcategory->color,
+                                    'grid'=> $subcategory->grid,
+                                ];
+                            }
+                            return null;
+                        })->filter()->toArray() // Filtrar valores nulos
+                    );
                 }
 
-                $categories = $query->get();
+                // Agregar categorías independientes que coincidan con la búsqueda
+                $independentCategories = Category::where('category', 'like', '%' . $search . '%')
+                    ->whereNotIn('id', $processedCategoryIds) // Excluir subcategorías ya procesadas
+                    ->with(['status'])
+                    ->get()
+                    ->map(function ($category) {
+                        return [
+                            'id' => $category->id,
+                            'category' => $category->category,
+                            'status' => $category->status,
+                            'img'=> $category->img,
+                            'sub_img'=> $category->sub_img,
+                            'video'=> $category->video,
+                            'icon'=> $category->icon,
+                            'color'=> $category->color,
+                            'grid'=> $category->grid,
+                            'subcategories' => $category->categories->map(function ($subcategory) use ($category) {
+                                return [
+                                    'id' => $subcategory->id,
+                                    'category' => $subcategory->category,
+                                    'parent_category' => $category->category,
+                                    'status' => $subcategory->status,
+                                    'img'=> $subcategory->img,
+                                    'sub_img'=> $subcategory->sub_img,
+                                    'video'=> $subcategory->video,
+                                    'icon'=> $subcategory->icon,
+                                    'color'=> $subcategory->color,
+                                    'grid'=> $subcategory->grid,
+                                ];
+                            })->toArray(), // Sin subcategorías porque son independientes
+                        ];
+                    });
 
-                // Filtrar resultados para solo incluir categorías específicas e incluir padre/hijos relevantes
-                $result['categories'] = $categories->map(function ($category) {
-                    return $category->load([
-                        'categories' => function ($query) use ($category) {
-                            $query->where('id', $category->id); // Incluir solo los hijos relevantes
-                        }
-                    ]);
-                });
+                // Combinar los resultados
+                foreach ($independentCategories as $independent) {
+                    $uniqueCategories[$independent['id']] = $independent;
+                }
+
+                $results = array_values($uniqueCategories);
+
+                // Asignar los resultados al array de categorías
+                $result['categories'] = $results;
             }
 
             // Componentes con búsqueda en los hijos
             if ($filters['component'] == 1) {
-                $query = Component::with(['status']);
+                $results = [];
 
-                if ($search) {
-                    $query->where('name', 'like', '%' . $search . '%')
-                        ->orWhereHas('components', function ($childQuery) use ($search) {
-                            $childQuery->where('name', 'like', '%' . $search . '%');
-                        });
+                // Buscar los componentes principales que coinciden o cuyos subcomponentes coincidan con el término
+                $matchingComponents = Component::whereHas('components', function ($query) use ($search) {
+                    $query->where('name', 'like', '%' . $search . '%');
+                })->with([
+                            'components' => function ($query) use ($search) {
+                                $query->where('name', 'like', '%' . $search . '%'); // Solo subcomponentes coincidentes
+                            },
+                            'status'
+                        ])->get();
+
+                // Construir un nuevo array desde cero para los subcomponentes
+                $subcomponentIds = [];
+                $uniqueComponents = [];
+
+                foreach ($matchingComponents as $component) {
+                    $id = $component->id;
+                    if (!isset($uniqueComponents[$id])) {
+                        $uniqueComponents[$id] = [
+                            'id' => $component->id,
+                            'name' => $component->name,
+                            'status' => $component->status, // Información del componente principal
+                            'components' => [],
+                        ];
+                    }
+
+                    $uniqueComponents[$id]['components'] = array_merge(
+                        $uniqueComponents[$id]['components'],
+                        $component->components->map(function ($subcomponent) use ($component, &$subcomponentIds) {
+                            $subcomponentIds[] = $subcomponent->id;
+                            return [
+                                'id' => $subcomponent->id,
+                                'name' => $subcomponent->name,
+                                'parent_name' => $component->name,
+                                'status' => $subcomponent->status,
+                            ];
+                        })->toArray()
+                    );
                 }
 
-                $components = $query->get();
+                // Unificar subcomponentes dentro de cada componente principal
+                foreach ($uniqueComponents as &$component) {
+                    $component['components'] = array_values(
+                        array_unique($component['components'], SORT_REGULAR)
+                    );
+                }
 
-                // Filtrar resultados para componentes relevantes
-                $result['components'] = $components->map(function ($component) {
-                    return $component->load([
-                        'components' => function ($query) use ($component) {
-                            $query->where('id', $component->id); // Incluir solo los hijos relevantes
-                        }
-                    ]);
-                });
+                // Incluir componentes independientes que coincidan con la búsqueda, pero no estén en subcomponentes
+                $independentComponents = Component::where('name', 'like', '%' . $search . '%')
+                    ->whereNotIn('id', $subcomponentIds) // Excluir los subcomponentes ya listados
+                    ->with(['status'])
+                    ->get()
+                    ->map(function ($component) {
+                        return [
+                            'id' => $component->id,
+                            'name' => $component->name,
+                            'status' => $component->status,
+                            'components' => $component->components->map(function ($subcomponent) use ($component) {
+                                return [
+                                    'id' => $subcomponent->id,
+                                    'name' => $subcomponent->name,
+                                    'parent_name' => $component->name,
+                                    'status' => $subcomponent->status, // Información del subcomponente
+                                ];
+                            })->toArray(),
+                        ];
+                    })->toArray();
+
+                // Añadir los componentes independientes al resultado final
+                foreach ($independentComponents as $independent) {
+                    $uniqueComponents[$independent['id']] = $independent;
+                }
+
+                // Convertir a un arreglo final de resultados
+                $results = array_values($uniqueComponents);
+
+                $result['components'] = $results;
             }
 
-            // Materiales con búsqueda en los hijos
             if ($filters['material'] == 1) {
-                $query = Material::with(['status', 'values', 'submaterials']);
+                $results = [];
 
-                if ($search) {
-                    $query->where('name', 'like', '%' . $search . '%')
-                        ->orWhereHas('submaterials', function ($childQuery) use ($search) {
-                            $childQuery->where('name', 'like', '%' . $search . '%');
-                        });
+                // Buscar los materiales principales y sus submateriales coincidentes
+                $matchingMaterials = Material::whereHas('submaterials', function ($query) use ($search) {
+                    $query->where('name', 'like', '%' . $search . '%');
+                })->with([
+                            'submaterials' => function ($query) use ($search) {
+                                $query->where('name', 'like', '%' . $search . '%'); // Submateriales coincidentes
+                            },
+                            'status',
+                            'values'
+                        ])->get();
+
+                $uniqueMaterials = [];
+                $processedSubmaterialIds = [];
+
+                // Construir un array único para los materiales
+                foreach ($matchingMaterials as $material) {
+                    $id = $material->id;
+                    if (!isset($uniqueMaterials[$id])) {
+                        $uniqueMaterials[$id] = [
+                            'id' => $material->id,
+                            'name' => $material->name,
+                            'status' => $material->status,
+                            'values' => $material->values,
+                            'submaterials' => [],
+                        ];
+                    }
+
+                    // Agregar los submateriales únicos
+                    $uniqueMaterials[$id]['submaterials'] = array_merge(
+                        $uniqueMaterials[$id]['submaterials'],
+                        $material->submaterials->map(function ($submaterial) use ($material, &$processedSubmaterialIds) {
+                            if (!in_array($submaterial->id, $processedSubmaterialIds)) {
+                                $processedSubmaterialIds[] = $submaterial->id;
+                                return [
+                                    'id' => $submaterial->id,
+                                    'name' => $submaterial->name,
+                                    'parent_name' => $material->name,
+                                    'status' => $submaterial->status,
+                                    'values' => $submaterial->values,
+                                ];
+                            }
+                            return null;
+                        })->filter()->toArray() // Filtrar nulls
+                    );
                 }
 
-                $materials = $query->get();
+                // Agregar materiales independientes que coincidan con la búsqueda
+                $independentMaterials = Material::where('name', 'like', '%' . $search . '%')
+                    ->whereNotIn('id', $processedSubmaterialIds) // Excluir submateriales ya procesados
+                    ->with(['status', 'values'])
+                    ->get()
+                    ->map(function ($material) {
+                        return [
+                            'id' => $material->id,
+                            'name' => $material->name,
+                            'status' => $material->status,
+                            'values' => $material->values,
+                            'submaterials' => $material->submaterials->map(function ($submaterial) use ($material) {
+                                return [
+                                    'id' => $submaterial->id,
+                                    'name' => $submaterial->name,
+                                    'parent_name' => $material->name,
+                                    'status' => $submaterial->status, // Información del submaterial
+                                    'values' => $submaterial->values,
+                                ];
+                            })->toArray(), // Sin submateriales porque son independientes
+                        ];
+                    });
 
-                // Filtrar resultados para materiales relevantes
-                $result['materials'] = $materials->map(function ($material) {
-                    return $material->load([
-                        'submaterials' => function ($query) use ($material) {
-                            $query->where('id', $material->id); // Incluir solo los submateriales relevantes
-                        }
-                    ]);
-                });
+                // Combinar los resultados
+                foreach ($independentMaterials as $independent) {
+                    $uniqueMaterials[$independent['id']] = $independent;
+                }
+
+                $results = array_values($uniqueMaterials);
+
+                $result['materials'] = $results;
             }
 
             if ($filters['attribute'] == 1) {

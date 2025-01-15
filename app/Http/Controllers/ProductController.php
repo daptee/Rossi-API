@@ -121,7 +121,7 @@ class ProductController extends Controller
         try {
             $featured = $request->query('featured');
             $search = $request->query('search'); // Parámetro de búsqueda
-            $perPage = $request->query('per_page', 30); // Número de elementos por página, por defecto 30
+            $perPage = $request->query('per_page', 30000000000); // Número de elementos por página, por defecto 30
 
             // Consulta inicial con relaciones necesarias
             $query = Product::with([
@@ -204,12 +204,21 @@ class ProductController extends Controller
             });
 
             // Metadata para paginación
-            $metaData = [
-                'page' => $products->currentPage(),
-                'per_page' => $products->perPage(),
-                'total' => $products->total(),
-                'last_page' => $products->lastPage(),
-            ];
+            if ($request->query('per_page') === null ) {
+                $metaData = [
+                    'page' => $products->currentPage(),
+                    'per_page' => null,
+                    'total' => $products->total(),
+                    'last_page' => $products->lastPage(),
+                ];
+            } else {
+                $metaData = [
+                    'page' => $products->currentPage(),
+                    'per_page' => $products->perPage(),
+                    'total' => $products->total(),
+                    'last_page' => $products->lastPage(),
+                ];
+            }
 
             // Respuesta con ApiResponse
             return ApiResponse::create('Productos obtenidos correctamente', 200, $products->items(), $metaData);
