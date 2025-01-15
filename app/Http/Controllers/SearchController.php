@@ -76,6 +76,7 @@ class SearchController extends Controller
                                 return [
                                     'id' => $subcategory->id,
                                     'category' => $subcategory->category,
+                                    'parent_category' => $category->category,
                                     'status' => $subcategory->status,
                                     'img'=> $subcategory->img,
                                     'sub_img'=> $subcategory->sub_img,
@@ -110,6 +111,7 @@ class SearchController extends Controller
                                 return [
                                     'id' => $subcategory->id,
                                     'category' => $subcategory->category,
+                                    'parent_category' => $category->category,
                                     'status' => $subcategory->status,
                                     'img'=> $subcategory->img,
                                     'sub_img'=> $subcategory->sub_img,
@@ -169,6 +171,7 @@ class SearchController extends Controller
                             return [
                                 'id' => $subcomponent->id,
                                 'name' => $subcomponent->name,
+                                'parent_name' => $component->name,
                                 'status' => $subcomponent->status,
                             ];
                         })->toArray()
@@ -196,6 +199,7 @@ class SearchController extends Controller
                                 return [
                                     'id' => $subcomponent->id,
                                     'name' => $subcomponent->name,
+                                    'parent_name' => $component->name,
                                     'status' => $subcomponent->status, // Información del subcomponente
                                 ];
                             })->toArray(),
@@ -252,6 +256,7 @@ class SearchController extends Controller
                                 return [
                                     'id' => $submaterial->id,
                                     'name' => $submaterial->name,
+                                    'parent_name' => $material->name,
                                     'status' => $submaterial->status,
                                     'values' => $submaterial->values,
                                 ];
@@ -276,6 +281,7 @@ class SearchController extends Controller
                                 return [
                                     'id' => $submaterial->id,
                                     'name' => $submaterial->name,
+                                    'parent_name' => $material->name
                                     'status' => $submaterial->status, // Información del submaterial
                                     'values' => $submaterial->values,
                                 ];
