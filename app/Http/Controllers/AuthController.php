@@ -29,7 +29,7 @@ class AuthController extends Controller
 
             $user = User::where('email', $request->email)->first();
 
-            if (! $user || ! Hash::check($request->password, $user->password)) {
+            if (!$user || !Hash::check($request->password, $user->password)) {
                 return ApiResponse::create('Credenciales no válidas', 401);
             }
 
@@ -51,4 +51,41 @@ class AuthController extends Controller
     {
         return response()->json(auth()->user());
     }
+
+    public function changePassword(Request $request)
+    {
+        try {
+            // Validar la entrada
+            $request->validate([
+                'current_password' => 'required|string',
+                'new_password' => 'required|string|min:8|confirmed',
+            ]);
+
+            // Obtener el usuario autenticado
+            $user = auth()->user();
+
+            // Verificar si la contraseña actual coincide
+            if (!Hash::check($request->current_password, $user->password)) {
+                return response()->json([
+                    'message' => 'La contraseña actual es incorrecta',
+                ], 400);
+            }
+
+            // Asignar la nueva contraseña (se encripta automáticamente en el modelo)
+            $user->password = $request->new_password;
+            $user->save();
+
+            return response()->json([
+                'message' => 'Contraseña actualizada con éxito',
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error al actualizar la contraseña',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+
 }
