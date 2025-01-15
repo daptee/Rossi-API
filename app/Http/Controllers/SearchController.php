@@ -70,7 +70,7 @@ class SearchController extends Controller
                     // Agregar las subcategorías únicas
                     $uniqueCategories[$id]['subcategories'] = array_merge(
                         $uniqueCategories[$id]['subcategories'],
-                        $category->categories->map(function ($subcategory) use (&$processedCategoryIds) {
+                        $category->categories->map(function ($subcategory) use ($category, &$processedCategoryIds) {
                             if (!in_array($subcategory->id, $processedCategoryIds)) {
                                 $processedCategoryIds[] = $subcategory->id;
                                 return [
@@ -107,7 +107,7 @@ class SearchController extends Controller
                             'icon'=> $category->icon,
                             'color'=> $category->color,
                             'grid'=> $category->grid,
-                            'subcategories' => $category->categories->map(function ($subcategory) {
+                            'subcategories' => $category->categories->map(function ($subcategory) use ($category) {
                                 return [
                                     'id' => $subcategory->id,
                                     'category' => $subcategory->category,
@@ -166,7 +166,7 @@ class SearchController extends Controller
 
                     $uniqueComponents[$id]['components'] = array_merge(
                         $uniqueComponents[$id]['components'],
-                        $component->components->map(function ($subcomponent) use (&$subcomponentIds) {
+                        $component->components->map(function ($subcomponent) use ($component, &$subcomponentIds) {
                             $subcomponentIds[] = $subcomponent->id;
                             return [
                                 'id' => $subcomponent->id,
@@ -195,7 +195,7 @@ class SearchController extends Controller
                             'id' => $component->id,
                             'name' => $component->name,
                             'status' => $component->status,
-                            'components' => $component->components->map(function ($subcomponent) {
+                            'components' => $component->components->map(function ($subcomponent) use ($component) {
                                 return [
                                     'id' => $subcomponent->id,
                                     'name' => $subcomponent->name,
@@ -250,7 +250,7 @@ class SearchController extends Controller
                     // Agregar los submateriales únicos
                     $uniqueMaterials[$id]['submaterials'] = array_merge(
                         $uniqueMaterials[$id]['submaterials'],
-                        $material->submaterials->map(function ($submaterial) use (&$processedSubmaterialIds) {
+                        $material->submaterials->map(function ($submaterial) use ($material, &$processedSubmaterialIds) {
                             if (!in_array($submaterial->id, $processedSubmaterialIds)) {
                                 $processedSubmaterialIds[] = $submaterial->id;
                                 return [
@@ -277,11 +277,11 @@ class SearchController extends Controller
                             'name' => $material->name,
                             'status' => $material->status,
                             'values' => $material->values,
-                            'submaterials' => $material->submaterials->map(function ($submaterial) {
+                            'submaterials' => $material->submaterials->map(function ($submaterial) use ($material) {
                                 return [
                                     'id' => $submaterial->id,
                                     'name' => $submaterial->name,
-                                    'parent_name' => $material->name
+                                    'parent_name' => $material->name,
                                     'status' => $submaterial->status, // Información del submaterial
                                     'values' => $submaterial->values,
                                 ];
