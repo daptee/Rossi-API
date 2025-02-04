@@ -6,8 +6,8 @@ use App\Http\Responses\ApiResponse;
 use Illuminate\Http\Request;
 use App\Models\Distributor;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\Notification;
 use Exception;
 
 class DistributorController extends Controller
@@ -184,6 +184,38 @@ class DistributorController extends Controller
             return ApiResponse::create('Distribuidor eliminado con éxito', 200);
         } catch (Exception $e) {
             return ApiResponse::create('Error al eliminar el distribuidor', 500, ['error' => $e->getMessage()]);
+        }
+    }
+
+    public function send(Request $request)
+    {
+        try {
+            // Validación de los datos recibidos
+            $validator = Validator::make($request->all(), [
+                'name' => 'required|string|max:150',
+                'company' => 'required|string|max:255',
+                'province' => 'required|string|max:255',
+                'locality' => 'required|string|max:255',
+                'phone' => 'required|string|max:20',
+                'email' => 'required|email|max:100',
+                'message' => 'required|string|max:255',
+            ]);
+
+            if ($validator->fails()) {
+                return ApiResponse::create('Validation failed', 422, $validator->errors());
+            }
+
+            // Procesar los datos para almacenar
+            $data = $request->all();
+
+            $recipientEmail = env('MAIL_NOTIFICATION_TO');
+
+            // Enviar el correo
+            Mail::to($recipientEmail)->send(new Notification($data));
+
+            return ApiResponse::create('Solicitud de distribuidor enviada correctamente', 200, []);
+        } catch (Exception $e) {
+            return ApiResponse::create('Error al enviar la solicitud para un nuevo distribuidor', 500, ['error' => $e->getMessage()]);
         }
     }
 }

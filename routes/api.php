@@ -82,6 +82,7 @@ Route::group([
     Route::post('/', [DistributorController::class, 'store'])->middleware('admin');
     Route::put('/{id}', [DistributorController::class, 'update'])->middleware('admin');
     Route::delete('/{id}', [DistributorController::class, 'destroy'])->middleware('admin');
+    Route::post('/send', [DistributorController::class, 'send']);
 });
 
 // Rutas del contenido de la web
