@@ -10,7 +10,7 @@ use Symfony\Component\Process\Exception\ProcessFailedException;
 
 class BackupController extends Controller
 {
-    public function backupDatabase()
+    public function createBackup()
     {
         $database = env('DB_DATABASE');
         $username = env('DB_USERNAME');
