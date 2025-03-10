@@ -15,7 +15,7 @@
  use App\Http\Controllers\MaterialController;
  use App\Http\Controllers\BackupController;
 
-Route::get('/backup', [BackupController::class, 'createBackup']);
+Route::get('/backup', [BackupController::class, 'createBackup'])->name('backup');
 
 Route::get('/clear-cache', [CacheController::class, 'clearCache'])->name('clearCache');
 
