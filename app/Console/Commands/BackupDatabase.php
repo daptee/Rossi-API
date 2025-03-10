@@ -1,49 +1,49 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Http\Controllers;
 
-use Illuminate\Console\Command;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
-class BackupDatabase extends Command
+class BackupController extends Controller
 {
-    protected $signature = 'database:backup';
-    protected $description = 'Prueba de ejecución del comando para debug';
-
-    public function __construct()
+    public function createBackup()
     {
-        parent::__construct();
-    }
+        $database = env('DB_DATABASE');
+        $username = env('DB_USERNAME');
+        $password = env('DB_PASSWORD');
+        $host = env('DB_HOST');
+        $storagePath = public_path('storage/backups'); // Ruta en public/
 
-    public function handle()
-    {
-        Log::info("Comando database:backup ejecutado correctamente.");
+        // Asegurar que el directorio de backups en public/ exista
+        if (!file_exists($storagePath)) {
+            mkdir($storagePath, 0755, true);
+        }
 
-        // // Variables de entorno
-        // $database = env('DB_DATABASE');
-        // $username = env('DB_USERNAME');
-        // $password = env('DB_PASSWORD');
-        // $host = env('DB_HOST');
-        // $storagePath = public_path('storage/backups'); // Ruta en public/
+        // Nombre del archivo con marca de tiempo
+        $fileName = "backup_" . Carbon::now()->format('Y_m_d_His') . ".sql";
+        $filePath = $storagePath . '/' . $fileName;
 
-        // // Asegurar que el directorio de backups en public/ exista
-        // if (!file_exists($storagePath)) {
-        //     mkdir($storagePath, 0755, true);
-        // }
+        // Comando para hacer el backup
+        $dumpCommand = "mysqldump -h {$host} -u {$username} --password={$password} {$database} > {$filePath}";
 
-        // // Nombre del archivo con marca de tiempo
-        // $fileName = "backup_" . Carbon::now()->format('Y_m_d_His') . ".sql";
-        // $filePath = $storagePath . '/' . $fileName;
+        exec($dumpCommand);
 
-        // // Comando para hacer el backup
-        // $dumpCommand = "mysqldump -h {$host} -u {$username} --password={$password} {$database} > {$filePath}";
-        // exec($dumpCommand);
-
-        // // Verificar si se creó correctamente el archivo
-        // if (file_exists($filePath)) {
-        //     Log::info("Backup creado con éxito: public/backups/{$fileName}");
-        // } else {
-        //     Log::error("Hubo un error al crear el backup.");
-        // }
+        // Verificar si se creó correctamente el archivo
+        if (file_exists($filePath)) {
+            Log::info("✅ Backup creado con éxito: public/backups/{$fileName}");
+            return response()->json([
+                'success' => true,
+                'message' => 'Backup creado con éxito.',
+                'file' => url("storage/backups/{$fileName}") // URL de descarga
+            ]);
+        } else {
+            Log::error("❌ Error al crear el backup.");
+            return response()->json([
+                'success' => false,
+                'message' => 'Hubo un error al crear el backup.'
+            ], 500);
+        }
     }
 }
