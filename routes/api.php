@@ -1,6 +1,7 @@
 <?php
  
  use App\Http\Controllers\AttributeController;
+ use App\Http\Controllers\CacheController;
  use App\Http\Controllers\CategoriesController;
  use App\Http\Controllers\ComponentController;
  use App\Http\Controllers\DistributorController;
@@ -13,6 +14,9 @@
  use App\Http\Controllers\AuthController;
  use App\Http\Controllers\MaterialController;
  
+
+Route::post('/clear-cache', [CacheController::class, 'clearCache'])->name('clearCache');
+
  // Rutas de autenticación
 Route::group([
     'middleware' => 'api',
