@@ -13,9 +13,11 @@
  use Illuminate\Support\Facades\Route;
  use App\Http\Controllers\AuthController;
  use App\Http\Controllers\MaterialController;
- 
+ use App\Http\Controllers\BackupController;
 
-Route::post('/clear-cache', [CacheController::class, 'clearCache'])->name('clearCache');
+Route::get('/backup', [BackupController::class, 'createBackup']);
+
+Route::get('/clear-cache', [CacheController::class, 'clearCache'])->name('clearCache');
 
  // Rutas de autenticación
 Route::group([
