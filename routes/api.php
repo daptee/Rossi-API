@@ -14,6 +14,7 @@
  use App\Http\Controllers\AuthController;
  use App\Http\Controllers\MaterialController;
  use App\Http\Controllers\BackupController;
+ use App\Http\Controllers\CatalogController;
 
 Route::get('/backup', [BackupController::class, 'createBackup'])->name('backup');
 
@@ -138,4 +139,12 @@ Route::group([
     'prefix' => 'search'
 ], function () {
     Route::get('/', [SearchController::class, 'index']);
+});
+
+Route::group([
+    'middleware' => 'api',
+    'prefix' => 'catalog'
+], function () {
+    Route::get('/', [CatalogController::class, 'index']);
+    Route::post('/{category}', [CatalogController::class, 'store'])->middleware('admin');
 });
