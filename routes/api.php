@@ -1,6 +1,7 @@
 <?php
  
  use App\Http\Controllers\AttributeController;
+ use App\Http\Controllers\CacheController;
  use App\Http\Controllers\CategoriesController;
  use App\Http\Controllers\ComponentController;
  use App\Http\Controllers\DistributorController;
@@ -12,7 +13,12 @@
  use Illuminate\Support\Facades\Route;
  use App\Http\Controllers\AuthController;
  use App\Http\Controllers\MaterialController;
- 
+ use App\Http\Controllers\BackupController;
+
+Route::get('/backup', [BackupController::class, 'createBackup'])->name('backup');
+
+Route::get('/clear-cache', [CacheController::class, 'clearCache'])->name('clearCache');
+
  // Rutas de autenticación
 Route::group([
     'middleware' => 'api',
@@ -82,6 +88,7 @@ Route::group([
     Route::post('/', [DistributorController::class, 'store'])->middleware('admin');
     Route::put('/{id}', [DistributorController::class, 'update'])->middleware('admin');
     Route::delete('/{id}', [DistributorController::class, 'destroy'])->middleware('admin');
+    Route::post('/send', [DistributorController::class, 'send']);
 });
 
 // Rutas del contenido de la web
