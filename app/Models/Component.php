@@ -19,7 +19,12 @@ class Component extends Model
         'img',
         'description',
         'status',
-        'id_category'
+        'id_category',
+        'meta_data',
+    ];
+
+    protected $casts = [
+        'meta_data' => 'array',
     ];
 
     public function status()

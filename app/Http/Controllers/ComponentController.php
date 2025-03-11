@@ -68,6 +68,7 @@ class ComponentController extends Controller
                 'img' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
                 'status' => 'required|integer|exists:status,id',
                 'id_category' => 'nullable|exists:categories,id',
+                'meta_data' => 'nullable|json',
                 'subComponents' => 'nullable|array',
                 'subComponents.*.name' => 'required_with:subComponents|string|max:255',
                 'subComponents.*.description' => 'nullable|string',
@@ -95,6 +96,8 @@ class ComponentController extends Controller
                 $imgPath = 'storage/components/images/' . $fileName;
             }
 
+            $decodedMetaData = json_decode($request->meta_data, true);
+
             // Crear el componente padre
             $component = Component::create([
                 'id_component' => $request->id_component,
@@ -103,6 +106,7 @@ class ComponentController extends Controller
                 'img' => $imgPath,
                 'status' => $request->status,
                 'id_category' => 1,
+                'meta_data' => $decodedMetaData,
             ]);
 
             // Procesar subcomponentes
@@ -144,6 +148,7 @@ class ComponentController extends Controller
                 'img' => 'sometimes', // Puede ser un string, null, o un archivo.
                 'status' => 'required|integer|exists:status,id',
                 'id_category' => 'nullable|exists:categories,id',
+                'meta_data' => 'nullable|json',
                 'subComponents' => 'nullable|array',
                 'subComponents.*.id' => 'nullable|exists:components,id',
                 'subComponents.*.name' => 'sometimes|required|string|max:255',
@@ -185,6 +190,9 @@ class ComponentController extends Controller
                 }
             }
 
+            $newMetaData = is_string($request->meta_data) ? json_decode($request->meta_data, true) : $request->meta_data;
+
+
             // Actualizar campos del componente principal
             $component->fill($request->only([
                 'id_component',
@@ -193,6 +201,8 @@ class ComponentController extends Controller
                 'status',
                 'id_category' => 1,
             ]));
+
+            $component->meta_data = $newMetaData;
             $component->save();
 
             // Procesar subcomponentes

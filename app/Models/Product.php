@@ -22,7 +22,12 @@ class Product extends Model
         'sub_img',
         'main_video',
         'file_data_sheet',
-        'featured'
+        'featured',
+        'meta_data',
+    ];
+
+    protected $casts = [
+        'meta_data' => 'array',
     ];
 
     public function attributes()
