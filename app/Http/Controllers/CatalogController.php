@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Responses\ApiResponse;
+use File;
 use Illuminate\Http\Request;
 use App\Models\Catalog;
 use Exception;
@@ -41,17 +43,31 @@ class CatalogController extends Controller
                 'pdf' => 'required|mimes:pdf|max:2048' // Máx 2MB
             ]);
 
+            // Buscar si ya existe un catálogo con ese nombre
+            $existingCatalog = Catalog::where('name', $categoryName)->first();
+
+            if ($existingCatalog) {
+                // Eliminar el PDF anterior si existe
+                $oldPdfPath = public_path($existingCatalog->pdf);
+                if (File::exists($oldPdfPath)) {
+                    File::delete($oldPdfPath);
+                }
+
+                // Eliminar el catálogo existente
+                $existingCatalog->delete();
+            }
+
             // Guardar el archivo en 'public/storage/catalog'
             $file = $request->file('pdf');
             $fileName = str_replace(' ', '_', strtolower($categoryName)) . '_' . time() . '.' . $file->getClientOriginalExtension();
             $filePath = 'storage/catalog/' . $fileName;
             $file->move(public_path('storage/catalog'), $fileName);
 
-            // Guardar en la base de datos
-            $catalog = Catalog::updateOrCreate(
-                ['name' => $categoryName], // Guardar con el nombre correcto
-                ['pdf' => $filePath]
-            );
+            // Crear el nuevo catálogo en la base de datos
+            $catalog = Catalog::create([
+                'name' => $categoryName,
+                'pdf' => $filePath
+            ]);
 
             return ApiResponse::create('Catalogo creado correctamente', 201, $catalog);
         } catch (Exception $e) {

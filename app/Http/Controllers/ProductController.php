@@ -145,7 +145,8 @@ class ProductController extends Controller
                     'main_video',
                     'file_data_sheet',
                     'status',
-                    'featured'
+                    'featured',
+                    'meta_data'
                 )
                 ->where('status', 2); // Solo productos con estado 2
 
@@ -412,6 +413,7 @@ class ProductController extends Controller
                 'main_video' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
                 'file_data_sheet' => 'nullable|file|mimes:pdf|max:5120',
                 'featured' => 'nullable|boolean',
+                'meta_data' => 'nullable|json',
                 'categories' => 'array',
                 'categories.*' => 'integer|exists:categories,id',
                 'gallery' => 'array',
@@ -453,6 +455,8 @@ class ProductController extends Controller
             $mainVideoPath = $request->hasFile('main_video') ? $request->file('main_video')->move("$baseStoragePath/videos", uniqid() . '_' . $request->file('main_video')->getClientOriginalName()) : null;
             $fileDataSheetPath = $request->hasFile('file_data_sheet') ? $request->file('file_data_sheet')->move("$baseStoragePath/data_sheets", uniqid() . '_' . $request->file('file_data_sheet')->getClientOriginalName()) : null;
 
+            $decodedMetaData = json_decode($request->meta_data, true);
+
             $product = Product::create([
                 'name' => $request->name,
                 'sku' => $request->sku,
@@ -467,6 +471,7 @@ class ProductController extends Controller
                 'main_video' => $mainVideoPath ? "storage/products/videos/" . basename($mainVideoPath) : null,
                 'file_data_sheet' => $fileDataSheetPath ? "storage/products/data_sheets/" . basename($fileDataSheetPath) : null,
                 'featured' => $request->featured,
+                'meta_data' => $decodedMetaData,
             ]);
 
 
@@ -576,6 +581,7 @@ class ProductController extends Controller
                 'main_video' => 'nullable',
                 'file_data_sheet' => 'nullable',
                 'featured' => 'nullable|boolean',
+                'meta_data' => 'nullable|json',
                 'categories' => 'array',
                 'categories.*' => 'integer|exists:categories,id',
                 'gallery' => 'array',
@@ -693,6 +699,8 @@ class ProductController extends Controller
                 }
             }
 
+            $newMetaData = is_string($request->meta_data) ? json_decode($request->meta_data, true) : $request->meta_data;
+
             $product->update([
                 'name' => $request->name,
                 'sku' => $request->sku,
@@ -703,6 +711,7 @@ class ProductController extends Controller
                 'description_underline' => $request->description_underline,
                 'status' => $request->status,
                 'featured' => $request->featured,
+                'meta_data' => $newMetaData,
             ]);
 
             // Actualizar categorías asociadas
