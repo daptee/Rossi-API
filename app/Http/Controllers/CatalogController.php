@@ -1,4 +1,4 @@
-<?php
+ñ<?php
 
 namespace App\Http\Controllers;
 
@@ -24,7 +24,9 @@ class CatalogController extends Controller
     public function store(Request $request, $category)
     {
         try {
-            // Mapeo de nombres en la URL a los nombres correctos
+            ini_set('upload_max_filesize', '50M');
+            ini_set('post_max_size', '50M');
+            // Mapeo de nombres en a URL a los nombres correctos
             $categoryMap = [
                 'diseno-y-oficina' => 'Diseño y Oficina',
                 'plasticos' => 'Plasticos',
@@ -40,7 +42,7 @@ class CatalogController extends Controller
 
             // Validar el archivo PDF
             $request->validate([
-                'pdf' => 'required|mimes:pdf|max:51200' // Máx 2MB
+                'pdf' => 'required|mimes:pdf|max:51200' // Máx 50MB
             ]);
 
             // Buscar si ya existe un catálogo con ese nombre
