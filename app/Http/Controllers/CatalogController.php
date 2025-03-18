@@ -40,7 +40,7 @@ class CatalogController extends Controller
 
             // Validar el archivo PDF
             $request->validate([
-                'pdf' => 'required|mimes:pdf|max:2048' // Máx 2MB
+                'pdf' => 'required|mimes:pdf|max:51200' // Máx 2MB
             ]);
 
             // Buscar si ya existe un catálogo con ese nombre
