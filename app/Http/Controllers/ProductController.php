@@ -241,7 +241,7 @@ class ProductController extends Controller
                 'gallery',
                 'components'
             ])
-                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'sub_img', 'main_video', 'file_data_sheet', 'status', 'featured')
+                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'sub_img', 'main_video', 'file_data_sheet', 'status', 'featured', 'meta_data')
                 ->findOrFail($id);
 
             // Limpia los datos del pivot para cada relación
@@ -299,7 +299,7 @@ class ProductController extends Controller
                 'gallery',
                 'components'
             ])
-                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'sub_img', 'main_video', 'file_data_sheet', 'status', 'featured')
+                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'sub_img', 'main_video', 'file_data_sheet', 'status', 'featured', 'meta_data')
                 ->where('sku', $sku)
                 ->firstOrFail();
 
