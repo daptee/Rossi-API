@@ -27,7 +27,7 @@ class ProductController extends Controller
             $perPage = $request->query('per_page', 300000000);
 
             // Consulta inicial
-            $query = Product::select('products.id', 'products.name', 'products.main_img', 'products.sub_img', 'products.status', 'products.featured', 'product_status.status_name', 'products.sku', 'products.slug', 'products.created_at')
+            $query = Product::select('products.id', 'products.name', 'products.main_img', 'products.sub_img', 'products.status', 'products.featured', 'product_status.status_name', 'products.sku', 'products.slug', 'products.meta_data', 'products.created_at')
                 ->join('product_status', 'products.status', '=', 'product_status.id')
                 ->with(['categories.parent', 'materials', 'attributes', 'gallery', 'components'])
                 ->withCount(['categories', 'materials', 'attributes', 'gallery', 'components']);
@@ -87,6 +87,7 @@ class ProductController extends Controller
                     'attributes_count' => $product->attributes_count,
                     'components_count' => $product->components_count,
                     'gallery_count' => $product->gallery_count,
+                    'meta_data' => $product->meta_data,
                     'created_date' => $product->created_at,
                 ];
             });
