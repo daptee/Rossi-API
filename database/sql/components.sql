@@ -8,6 +8,7 @@ CREATE TABLE components (
     description TEXT,
     status INT NOT NULL,
     id_category INT DEFAULT NULL,
+    meta_data JSON DEFAULT NULL,
     created_at TIMESTAMP NULL DEFAULT NULL,
     updated_at TIMESTAMP NULL DEFAULT NULL,
     FOREIGN KEY (status) REFERENCES status(id),

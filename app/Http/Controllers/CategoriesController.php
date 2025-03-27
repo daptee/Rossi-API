@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use Exception;
 use App\Models\Category;
+use Log;
 
 class CategoriesController extends Controller
 {
@@ -88,11 +89,12 @@ class CategoriesController extends Controller
                 'color' => 'nullable|string',
                 'status' => 'required|integer|exists:status,id',
                 'grid' => 'nullable|json',
+                'meta_data' => 'nullable|json',
                 'id_category' => 'nullable|exists:categories,id',
             ]);
 
             if ($validator->fails()) {
-                return ApiResponse::create(message: 'Validation failed', code: 422, result: $validator->errors());
+                return ApiResponse::create('Validation failed', 422, $validator->errors());
             }
 
             $imgPath = null;
@@ -128,6 +130,7 @@ class CategoriesController extends Controller
             }
 
             $decodedGrid = json_decode($request->grid, true);
+            $decodedMetaData = json_decode($request->meta_data, true);
 
             // Procesar archivos adicionales y asignarlos a los elementos de grid
             for ($i = 1; $i <= 3; $i++) {
@@ -159,6 +162,7 @@ class CategoriesController extends Controller
                 'color' => $request->input('color'),
                 'status' => $request->input('status'),
                 'grid' => $decodedGrid,
+                'meta_data' => $decodedMetaData,
             ]);
 
             $category->save();
@@ -204,6 +208,7 @@ class CategoriesController extends Controller
                 'color' => 'nullable|string',
                 'status' => 'required|integer|exists:status,id',
                 'grid' => 'nullable|json',
+                'meta_data' => 'nullable|json',
                 'id_category' => 'nullable|exists:categories,id',
             ]);
 
@@ -222,6 +227,8 @@ class CategoriesController extends Controller
             $existingGridData = is_string($category->grid) ? json_decode($category->grid, true) : $category->grid;
             $newGridData = is_string($request->grid) ? json_decode($request->grid, true) : $request->grid;
 
+            $newMetaData = is_string($request->meta_data) ? json_decode($request->meta_data, true) : $request->meta_data;
+
             // Procesar archivos en la nueva `grid`
             if ($newGridData != null) {
                 foreach ($newGridData as $key => &$newGridItem) {
@@ -233,9 +240,9 @@ class CategoriesController extends Controller
 
                     if ($request->hasFile($fileField)) {
                         // Si hay un archivo nuevo, elimina el archivo existente si es diferente
-                       /*  if ($existingFileUrl && $existingFileUrl !== $newGridItem['props']['file']['url']) {
-                            $this->deleteFile($existingFileUrl);
-                        } */
+                        /*  if ($existingFileUrl && $existingFileUrl !== $newGridItem['props']['file']['url']) {
+                             $this->deleteFile($existingFileUrl);
+                         } */
 
                         // Guardar el nuevo archivo
                         $fileName = time() . '_' . $request->file($fileField)->getClientOriginalName();
@@ -244,10 +251,10 @@ class CategoriesController extends Controller
                         // Actualizar la URL del archivo en la nueva `grid`
                         $newGridItem['props']['file']['url'] = 'storage/categories/grid/' . $fileName;
                     } /* elseif ($existingFileUrl && !isset($newGridItem['props']['file']['url'])) {
-                        // Si no se envía un archivo nuevo pero había uno antiguo, eliminar el archivo antiguo
-                        $this->deleteFile($existingFileUrl);
-                        $newGridItem['props']['file']['url'] = null;
-                    } */
+                       // Si no se envía un archivo nuevo pero había uno antiguo, eliminar el archivo antiguo
+                       $this->deleteFile($existingFileUrl);
+                       $newGridItem['props']['file']['url'] = null;
+                   } */
                 }
             }
 
@@ -262,6 +269,7 @@ class CategoriesController extends Controller
                 'color' => $request->input('color'),
                 'status' => $request->input('status'),
                 'grid' => $newGridData,
+                'meta_data' => $newMetaData,
             ]);
 
             $category->load('status');

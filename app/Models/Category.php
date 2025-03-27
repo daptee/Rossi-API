@@ -20,11 +20,13 @@ class Category extends Model
         'icon',
         'color',
         'status',
-        'grid'
+        'grid',
+        'meta_data'
     ];
 
     protected $casts = [
         'grid' => 'array',
+        'meta_data' => 'array',
     ];
 
     public function parent()

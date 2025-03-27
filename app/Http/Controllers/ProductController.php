@@ -27,7 +27,7 @@ class ProductController extends Controller
             $perPage = $request->query('per_page', 300000000);
 
             // Consulta inicial
-            $query = Product::select('products.id', 'products.name', 'products.main_img', 'products.sub_img', 'products.status', 'products.featured', 'product_status.status_name', 'products.sku', 'products.slug', 'products.created_at')
+            $query = Product::select('products.id', 'products.name', 'products.main_img', 'products.sub_img', 'products.status', 'products.featured', 'product_status.status_name', 'products.sku', 'products.slug', 'products.meta_data', 'products.created_at')
                 ->join('product_status', 'products.status', '=', 'product_status.id')
                 ->with(['categories.parent', 'materials', 'attributes', 'gallery', 'components'])
                 ->withCount(['categories', 'materials', 'attributes', 'gallery', 'components']);
@@ -87,6 +87,7 @@ class ProductController extends Controller
                     'attributes_count' => $product->attributes_count,
                     'components_count' => $product->components_count,
                     'gallery_count' => $product->gallery_count,
+                    'meta_data' => $product->meta_data,
                     'created_date' => $product->created_at,
                 ];
             });
@@ -145,7 +146,8 @@ class ProductController extends Controller
                     'main_video',
                     'file_data_sheet',
                     'status',
-                    'featured'
+                    'featured',
+                    'meta_data'
                 )
                 ->where('status', 2); // Solo productos con estado 2
 
@@ -240,7 +242,7 @@ class ProductController extends Controller
                 'gallery',
                 'components'
             ])
-                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'sub_img', 'main_video', 'file_data_sheet', 'status', 'featured')
+                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'sub_img', 'main_video', 'file_data_sheet', 'status', 'featured', 'meta_data')
                 ->findOrFail($id);
 
             // Limpia los datos del pivot para cada relación
@@ -298,7 +300,7 @@ class ProductController extends Controller
                 'gallery',
                 'components'
             ])
-                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'sub_img', 'main_video', 'file_data_sheet', 'status', 'featured')
+                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'sub_img', 'main_video', 'file_data_sheet', 'status', 'featured', 'meta_data')
                 ->where('sku', $sku)
                 ->firstOrFail();
 
@@ -412,6 +414,7 @@ class ProductController extends Controller
                 'main_video' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
                 'file_data_sheet' => 'nullable|file|mimes:pdf|max:5120',
                 'featured' => 'nullable|boolean',
+                'meta_data' => 'nullable|json',
                 'categories' => 'array',
                 'categories.*' => 'integer|exists:categories,id',
                 'gallery' => 'array',
@@ -453,6 +456,8 @@ class ProductController extends Controller
             $mainVideoPath = $request->hasFile('main_video') ? $request->file('main_video')->move("$baseStoragePath/videos", uniqid() . '_' . $request->file('main_video')->getClientOriginalName()) : null;
             $fileDataSheetPath = $request->hasFile('file_data_sheet') ? $request->file('file_data_sheet')->move("$baseStoragePath/data_sheets", uniqid() . '_' . $request->file('file_data_sheet')->getClientOriginalName()) : null;
 
+            $decodedMetaData = json_decode($request->meta_data, true);
+
             $product = Product::create([
                 'name' => $request->name,
                 'sku' => $request->sku,
@@ -467,6 +472,7 @@ class ProductController extends Controller
                 'main_video' => $mainVideoPath ? "storage/products/videos/" . basename($mainVideoPath) : null,
                 'file_data_sheet' => $fileDataSheetPath ? "storage/products/data_sheets/" . basename($fileDataSheetPath) : null,
                 'featured' => $request->featured,
+                'meta_data' => $decodedMetaData,
             ]);
 
 
@@ -576,6 +582,7 @@ class ProductController extends Controller
                 'main_video' => 'nullable',
                 'file_data_sheet' => 'nullable',
                 'featured' => 'nullable|boolean',
+                'meta_data' => 'nullable|json',
                 'categories' => 'array',
                 'categories.*' => 'integer|exists:categories,id',
                 'gallery' => 'array',
@@ -693,6 +700,8 @@ class ProductController extends Controller
                 }
             }
 
+            $newMetaData = is_string($request->meta_data) ? json_decode($request->meta_data, true) : $request->meta_data;
+
             $product->update([
                 'name' => $request->name,
                 'sku' => $request->sku,
@@ -703,6 +712,7 @@ class ProductController extends Controller
                 'description_underline' => $request->description_underline,
                 'status' => $request->status,
                 'featured' => $request->featured,
+                'meta_data' => $newMetaData,
             ]);
 
             // Actualizar categorías asociadas
