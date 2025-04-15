@@ -390,6 +390,12 @@ class CategoriesController extends Controller
             if ($category->sub_img) {
                 $this->deleteFile(public_path($category->sub_img));
             }
+            if ($category->thumbnail_img) {
+                $this->deleteFile(public_path($category->thumbnail_img));
+            }
+            if ($category->thumbnail_sub_img) {
+                $this->deleteFile(public_path($category->thumbnail_sub_img));
+            }
             if ($category->video) {
                 $this->deleteFile(public_path($category->video));
             }
