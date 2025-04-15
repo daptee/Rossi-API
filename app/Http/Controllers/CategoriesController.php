@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\ImageHelper;
 use App\Http\Responses\ApiResponse;
 use App\Models\Product;
 use Illuminate\Http\Request;
@@ -9,6 +10,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use Exception;
 use App\Models\Category;
+use Intervention\Image\ImageManager;
 use Log;
 
 class CategoriesController extends Controller
@@ -107,12 +109,20 @@ class CategoriesController extends Controller
 
             if ($request->hasFile('img')) {
                 $fileName = time() . '_' . $request->file('img')->getClientOriginalName();
+                $imgPathThumbnail = ImageHelper::saveReducedImage(
+                    $request->file('img'),
+                    'storage/categories/images/'
+                );
                 $request->file('img')->move($baseStoragePath . 'images/', $fileName);
                 $imgPath = 'storage/categories/images/' . $fileName;
             }
 
             if ($request->hasFile('sub_img')) {
                 $fileName = time() . '_' . $request->file('sub_img')->getClientOriginalName();
+                $subImgPathThumbnail = ImageHelper::saveReducedImage(
+                    $request->file('sub_img'),
+                    'storage/categories/images/'
+                );
                 $request->file('sub_img')->move($baseStoragePath . 'images/', $fileName);
                 $subImgPath = 'storage/categories/images/' . $fileName;
             }
@@ -129,23 +139,25 @@ class CategoriesController extends Controller
                 $iconPath = 'storage/categories/icons/' . $fileName;
             }
 
-            $decodedGrid = json_decode($request->grid, true);
-            $decodedMetaData = json_decode($request->meta_data, true);
+            $decodedGrid = !empty($request->grid) ? json_decode($request->grid, true) : null;
+            $decodedMetaData = !empty($request->meta_data) ? json_decode($request->meta_data, true) : null;
 
             // Procesar archivos adicionales y asignarlos a los elementos de grid
-            for ($i = 1; $i <= 3; $i++) {
-                $fileKey = 'file_' . $i;
-                if ($request->hasFile($fileKey)) {
-                    $fileName = time() . '_' . $request->file($fileKey)->getClientOriginalName();
-                    $request->file($fileKey)->move($baseStoragePath . 'grid/', $fileName);
-                    $fileUrl = 'storage/categories/grid/' . $fileName;
+            if (is_array($decodedGrid)) {
+                for ($i = 1; $i <= 3; $i++) {
+                    $fileKey = 'file_' . $i;
+                    if ($request->hasFile($fileKey)) {
+                        $fileName = time() . '_' . $request->file($fileKey)->getClientOriginalName();
+                        $request->file($fileKey)->move($baseStoragePath . 'grid/', $fileName);
+                        $fileUrl = 'storage/categories/grid/' . $fileName;
 
-                    // Asignar la URL del archivo al elemento correspondiente en grid
-                    $gridItemId = (string) $i;
-                    foreach ($decodedGrid as &$gridItem) {
-                        if ($gridItem['id'] === $gridItemId) {
-                            $gridItem['props']['file']['url'] = $fileUrl;
-                            break;
+                        // Asignar la URL del archivo al elemento correspondiente en grid
+                        $gridItemId = (string) $i;
+                        foreach ($decodedGrid as &$gridItem) {
+                            if ($gridItem['id'] === $gridItemId) {
+                                $gridItem['props']['file']['url'] = $fileUrl;
+                                break;
+                            }
                         }
                     }
                 }
@@ -157,6 +169,8 @@ class CategoriesController extends Controller
                 'category' => $request->input('category'),
                 'img' => $imgPath,
                 'sub_img' => $subImgPath,
+                'thumbnail_img' => $imgPathThumbnail,
+                'thumbnail_sub_img' => $subImgPathThumbnail,
                 'video' => $videoPath,
                 'icon' => $iconPath,
                 'color' => $request->input('color'),
@@ -218,8 +232,37 @@ class CategoriesController extends Controller
 
             $category = Category::findOrFail($id);
 
+            if ($request->hasFile('img')) {
+                // Asegurarse de que la imagen existe ahora
+                $thumbnailImgPath = ImageHelper::saveReducedImage(
+                    $request->file('img'),
+                    'storage/categories/images/'
+                );
+                // Eliminar el thumbnail anterior si corresponde
+                if ($category->thumbnail_img && file_exists(public_path($category->thumbnail_img))) {
+                    Log::info('tummmmmmm'. $category->thumbnail_img);
+                    unlink(public_path($category->thumbnail_img));
+                }
+            } else {
+                $thumbnailImgPath = $category->thumbnail_img;
+            }
             $imgPath = $this->processField($request, 'img', $category->img, public_path('storage/categories/images/'));
+
+            if ($request->hasFile('sub_img')) {
+                // Asegurarse de que la imagen existe ahora
+                $thumbnailSubImgPath = ImageHelper::saveReducedImage(
+                    $request->file('sub_img'),
+                    'storage/categories/images/'
+                );
+                // Eliminar el thumbnail anterior si corresponde
+                if ($category->thumbnail_sub_img && file_exists(public_path($category->thumbnail_sub_img))) {
+                    unlink(public_path($category->thumbnail_sub_img));
+                }
+            } else {
+                $thumbnailSubImgPath = $category->thumbnail_sub_img;
+            }
             $subImgPath = $this->processField($request, 'sub_img', $category->sub_img, public_path('storage/categories/images/'));
+            
             $videoPath = $this->processField($request, 'video', $category->video, public_path('storage/categories/videos/'));
             $iconPath = $this->processField($request, 'icon', $category->icon, public_path('storage/categories/icons/'));
 
@@ -251,10 +294,10 @@ class CategoriesController extends Controller
                         // Actualizar la URL del archivo en la nueva `grid`
                         $newGridItem['props']['file']['url'] = 'storage/categories/grid/' . $fileName;
                     } /* elseif ($existingFileUrl && !isset($newGridItem['props']['file']['url'])) {
-                       // Si no se envía un archivo nuevo pero había uno antiguo, eliminar el archivo antiguo
-                       $this->deleteFile($existingFileUrl);
-                       $newGridItem['props']['file']['url'] = null;
-                   } */
+                     // Si no se envía un archivo nuevo pero había uno antiguo, eliminar el archivo antiguo
+                     $this->deleteFile($existingFileUrl);
+                     $newGridItem['props']['file']['url'] = null;
+                 } */
                 }
             }
 
@@ -263,7 +306,9 @@ class CategoriesController extends Controller
                 'id_category' => $request->input('id_category'),
                 'category' => $request->input('category'),
                 'img' => $imgPath,
+                'thumbnail_img' => $thumbnailImgPath,
                 'sub_img' => $subImgPath,
+                'thumbnail_sub_img' => $thumbnailSubImgPath,
                 'video' => $videoPath,
                 'icon' => $iconPath,
                 'color' => $request->input('color'),
