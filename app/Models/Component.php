@@ -17,6 +17,7 @@ class Component extends Model
         'id_component',
         'name',
         'img',
+        'thumbnail_img',
         'description',
         'status',
         'id_category',
