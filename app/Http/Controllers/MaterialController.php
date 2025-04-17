@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\ImageHelper;
 use App\Http\Responses\ApiResponse;
 use Illuminate\Http\Request;
 use App\Models\Material;
@@ -156,8 +157,13 @@ class MaterialController extends Controller
         // Procesar la imagen si existe
         if (isset($valueData['img']) && $valueData['img'] instanceof \Illuminate\Http\UploadedFile) {
             $fileName = time() . '_' . $valueData['img']->getClientOriginalName();
+            $thumbnailPath = ImageHelper::saveReducedImage(
+                $valueData['img'],
+                'storage/materials/images/'
+            );
             $valueData['img']->move($baseStoragePath, $fileName);
             $valueData['img'] = 'storage/materials/images/' . $fileName;
+            $valueData['thumbnail_img'] = $thumbnailPath;
         }
 
         $valueData['id_material'] = $materialId;
@@ -209,6 +215,9 @@ class MaterialController extends Controller
                 if ($valueToDelete->img) {
                     $this->deleteFile($valueToDelete->img);
                 }
+                if ($valueToDelete->thumbnail_img) {
+                    $this->deleteFile($valueToDelete->thumbnail_img);
+                }
                 $valueToDelete->delete();
             }
 
@@ -236,6 +245,9 @@ class MaterialController extends Controller
                         if ($subValue->img) {
                             $this->deleteFile($subValue->img);
                         }
+                        if ($subValue->thumbnail_img) {
+                            $this->deleteFile($subValue->thumbnail_img);
+                        }
                         $subValue->delete();
                     }
                     $submaterialToDelete->delete();
@@ -259,6 +271,9 @@ class MaterialController extends Controller
                         $subValueToDelete = MaterialValue::findOrFail($subValueId);
                         if ($subValueToDelete->img) {
                             $this->deleteFile($subValueToDelete->img);
+                        }
+                        if ($subValueToDelete->thumbnail_img) {
+                            $this->deleteFile($subValueToDelete->thumbnail_img);
                         }
                         $subValueToDelete->delete();
                     }
@@ -297,11 +312,19 @@ class MaterialController extends Controller
                 if ($value->img) {
                     $this->deleteFile($value->img);
                 }
+                if ($value->thumbnail_img) {
+                    $this->deleteFile($value->thumbnail_img);
+                }
 
                 // Guardar la nueva imagen
                 $fileName = time() . '_' . $valueData['img']->getClientOriginalName();
+                $thumbnailPath = ImageHelper::saveReducedImage(
+                    $valueData['img'],
+                    'storage/materials/images/'
+                );
                 $valueData['img']->move($baseStoragePath, $fileName);
                 $valueData['img'] = 'storage/materials/images/' . $fileName;
+                $valueData['thumbnail_img'] = $thumbnailPath;
             }
 
             // Actualizar el valor con la información proporcionada
@@ -310,13 +333,19 @@ class MaterialController extends Controller
             // Si es un nuevo valor, procesar la imagen si se proporciona
             if (isset($valueData['img']) && $valueData['img'] instanceof \Illuminate\Http\UploadedFile) {
                 $fileName = time() . '_' . $valueData['img']->getClientOriginalName();
+                $thumbnailPath = ImageHelper::saveReducedImage(
+                    $valueData['img'],
+                    'storage/materials/images/'
+                );
                 $valueData['img']->move($baseStoragePath, $fileName);
                 $valueData['img'] = 'storage/materials/images/' . $fileName;
+                $valueData['thumbnail_img'] = $thumbnailPath;
             }
 
             // Si no se proporciona imagen en la creación, establecer `img` como `null`
             $valueData['id_material'] = $material->id;
             $valueData['img'] = $valueData['img'] ?? null;
+            $valueData['thumbnail_img'] = $valueData['img'] ?? null;
             MaterialValue::create($valueData);
         }
     }
