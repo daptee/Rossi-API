@@ -19,7 +19,9 @@ class Product extends Model
         'description_underline',
         'status',
         'main_img',
+        'thumbnail_main_img',
         'sub_img',
+        'thumbnail_sub_img',
         'main_video',
         'file_data_sheet',
         'featured',
@@ -33,7 +35,7 @@ class Product extends Model
     public function attributes()
     {
         return $this->belongsToMany(AttributeValue::class, 'product_attributes', 'id_product', 'id_attribute_value')
-            ->withPivot('img')
+            ->withPivot(['img', 'thumbnail_img']) 
             ->with('attribute');
     }
 
@@ -45,7 +47,7 @@ class Product extends Model
     public function materials()
     {
         return $this->belongsToMany(MaterialValue::class, 'product_materials', 'id_product', 'id_material')
-            ->withPivot('img')
+            ->withPivot(['img', 'thumbnail_img']) 
             ->with('material'); // Esto carga la relación con el modelo Material
     }
 

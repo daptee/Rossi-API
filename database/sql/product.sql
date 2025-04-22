@@ -90,3 +90,16 @@ CREATE TABLE product_components (
     FOREIGN KEY (id_product) REFERENCES products(id) ON DELETE CASCADE,
     FOREIGN KEY (id_component) REFERENCES components(id) ON DELETE CASCADE
 );
+
+ALTER TABLE products
+ADD COLUMN thumbnail_main_img VARCHAR(255) AFTER main_img,
+ADD COLUMN thumbnail_sub_img VARCHAR(255) AFTER sub_img;
+
+ALTER TABLE product_galleries
+ADD COLUMN thumbnail_file VARCHAR(255) AFTER file;
+
+ALTER TABLE product_materials
+ADD COLUMN thumbnail_img VARCHAR(255) AFTER img;
+
+ALTER TABLE product_attributes
+ADD COLUMN thumbnail_img VARCHAR(255) AFTER img;
