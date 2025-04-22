@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\ImageHelper;
 use App\Models\GalleryWebContentAbout;
 use App\Models\WebContentAbout;
 use App\Http\Responses\ApiResponse;
@@ -95,7 +96,13 @@ class WebContentAboutController extends Controller
                         // Crear el directorio si no existe
                         if (!file_exists($galleryDirectory)) {
                             mkdir($galleryDirectory, 0755, true);
-                        }
+                        };
+
+                        
+                        $newFileThumbnailPath = ImageHelper::saveReducedImage(
+                            $galleryItem['file'],
+                            "storage/web_content_about/gallery/",
+                        );
 
                         // Mover la imagen al almacenamiento
                         $uploadedFile->move($galleryDirectory, $uniqueFileName);
@@ -104,11 +111,13 @@ class WebContentAboutController extends Controller
                         $gallery = GalleryWebContentAbout::create([
                             'id_web_content_about' => $webContent->id,
                             'file' => "storage/web_content_about/gallery/" . $uniqueFileName,
+                            'thumbnail_file' => $newFileThumbnailPath,
                         ]);
 
                         // Actualizar el JSON `data` con la información de la imagen
                         if (isset($decodedData['gallery'][$index])) {
                             $decodedData['gallery'][$index]['file'] = $gallery->file;
+                            $decodedData['gallery'][$index]['thumbnail_file'] = $gallery->thumbnail_file;
                             $decodedData['gallery'][$index]['id'] = $gallery->id;
                         }
                     }
@@ -189,24 +198,41 @@ class WebContentAboutController extends Controller
                         if ($existingImage) {
                             // Eliminar la imagen anterior del servidor
                             $oldImagePath = public_path($existingImage->file);
+                            $oldThumbnailImagePath = public_path($existingImage->thumbnail_file);
                             if (file_exists($oldImagePath)) {
                                 unlink($oldImagePath);
                             }
 
+                            if (file_exists($oldThumbnailImagePath) && $existingImage->thumbnail_file != null) {
+                                unlink($oldThumbnailImagePath);
+                            }
+
                             // Subir la nueva imagen
                             $uploadedFile = $galleryItem['file'];
+
+                            $thumbnailFilePath = ImageHelper::saveReducedImage(
+                                $galleryItem['file'],
+                                "storage/web_content_about/gallery/",
+                            );
+
                             $uniqueFileName = uniqid() . '_' . time() . '.' . $uploadedFile->getClientOriginalExtension();
                             $galleryDirectory = public_path('storage/web_content_about/gallery');
                             $uploadedFile->move($galleryDirectory, $uniqueFileName);
 
                             // Actualizar la base de datos
                             $newFilePath = "storage/web_content_about/gallery/" . $uniqueFileName;
-                            $existingImage->update(['file' => $newFilePath]);
+                            $existingImage->update(
+                                [
+                                    'file' => $newFilePath,
+                                    'thumbnail_file'=> $thumbnailFilePath,
+                                ]
+                            );
 
                             // Actualizar el JSON
                             foreach ($decodedData['gallery'] as &$file) {
                                 if ($file['id'] == $galleryItem['id']) {
                                     $file['file'] = $newFilePath;
+                                    $file['thumbnail_file'] = $thumbnailFilePath;
                                     break;
                                 }
                             }
@@ -224,6 +250,12 @@ class WebContentAboutController extends Controller
 
                         Log::info("holaaaaa");
                         $uploadedFile = $galleryItem['file'];
+
+                        $newThumbnailFilePath = ImageHelper::saveReducedImage(
+                            $galleryItem['file'],
+                            "storage/web_content_about/gallery/",
+                        );
+
                         $uniqueFileName = uniqid() . '_' . time() . '.' . $uploadedFile->getClientOriginalExtension();
                         $galleryDirectory = public_path('storage/web_content_about/gallery');
                         $uploadedFile->move($galleryDirectory, $uniqueFileName);
@@ -233,6 +265,7 @@ class WebContentAboutController extends Controller
                         // Guardar la imagen en la base de datos
                         $newGalleryImage = GalleryWebContentAbout::create([
                             'file' => $newFilePath,
+                            'thumbnail_file'=> $newThumbnailFilePath,
                             'id_web_content_about' => $webContent->id // Asegúrate de que este campo se asocia correctamente
                         ]);
 
@@ -240,6 +273,7 @@ class WebContentAboutController extends Controller
                         foreach ($decodedData['gallery'] as &$file) {
                             if (is_null($file['id']) && empty($file['file'])) {
                                 $file['file'] = $newFilePath;
+                                $file['thumbnail_file'] = $newThumbnailFilePath;
                                 $file['id'] = $newGalleryImage->id; // Usar el id generado en la base de datos
                                 break;
                             }

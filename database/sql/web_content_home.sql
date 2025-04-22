@@ -19,3 +19,6 @@ CREATE TABLE web_content_home_files (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+
+ALTER TABLE web_content_home_files
+ADD COLUMN thumbnail_path VARCHAR(255) AFTER path;
