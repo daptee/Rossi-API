@@ -26,6 +26,7 @@ class WebContentHomeFile extends Model
         'name',
         'type',
         'path',
+        'thumbnail_path'
     ];
 
     /**
