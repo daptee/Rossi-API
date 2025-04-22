@@ -97,6 +97,9 @@ class WebContentHomeController extends Controller
             foreach ($files as $file) {
                 if ($request->hasFile($file['name'])) {
                     $uploadedFile = $request->file($file['name']);
+                    if ($file['name'] == 'imagen1' || $file['name'] == 'imagen2') {
+                        # code...
+                    }
                     $path = $this->storeFile($uploadedFile, 'storage/web_content_home');
                     $this->updateDecodedData($decodedData, $file, $path, $webContent->id);
                 }
