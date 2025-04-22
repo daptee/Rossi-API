@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\ImageHelper;
 use App\Models\Product;
 use App\Models\WebContentHome;
 use App\Http\Responses\ApiResponse;
@@ -96,12 +97,16 @@ class WebContentHomeController extends Controller
 
             foreach ($files as $file) {
                 if ($request->hasFile($file['name'])) {
+                    $thumbnailImagenPath = null;
                     $uploadedFile = $request->file($file['name']);
                     if ($file['name'] == 'imagen1' || $file['name'] == 'imagen2') {
-                        # code...
+                        $thumbnailImagenPath = ImageHelper::saveReducedImage(
+                            $uploadedFile,
+                            "storage/web_content_home/",
+                        );
                     }
                     $path = $this->storeFile($uploadedFile, 'storage/web_content_home');
-                    $this->updateDecodedData($decodedData, $file, $path, $webContent->id);
+                    $this->updateDecodedData($decodedData, $file, $thumbnailImagenPath, $path, $webContent->id);
                 }
             }
 
@@ -119,12 +124,19 @@ class WebContentHomeController extends Controller
                     if ($uploadedSliderImage && $uploadedSliderImage->isValid()) {
                         Log::info("Archivo encontrado: " . $uploadedSliderImage->getClientOriginalName());
 
+                        $thumbnailSliderImage = ImageHelper::saveReducedImage(
+                            $uploadedSliderImage,
+                            "storage/web_content_home/",
+                        );
+
                         // Guardar el archivo y actualizar la URL
                         $path = $this->storeFile($uploadedSliderImage, 'storage/web_content_home');
                         $imageData['img']['url'] = $path;
+                        $imageData['img']['thumbnail_url'] = $thumbnailSliderImage;
                     } else {
                         Log::warning("No se encontró archivo para imgSlider[$index]");
                         $imageData['img']['url'] = null; // En caso de que no se encuentre el archivo
+                        $imageData['img']['thumbnail_url'] = null;
                     }
                 }
             }
@@ -160,18 +172,20 @@ class WebContentHomeController extends Controller
     /**
      * Actualiza los datos decodificados para incluir las rutas de los archivos.
      */
-    private function updateDecodedData(&$decodedData, $file, $path, $webContentId)
+    private function updateDecodedData(&$decodedData, $file, $thumbnailFile, $path, $webContentId)
     {
         WebContentHomeFile::create([
             'id_web_content_home' => $webContentId,
             'name' => $file['name'],
             'type' => $file['type'],
             'path' => $path,
+            'thumbnail_path' => $thumbnailFile,
         ]);
 
         foreach ($decodedData['files'] as &$fileData) {
             if ($fileData['name'] === $file['name']) {
                 $fileData['file'] = $path;
+                $fileData['file_path'] = $thumbnailFile;
                 break;
             }
         }
@@ -217,8 +231,15 @@ class WebContentHomeController extends Controller
 
             foreach ($files as $file) {
                 if ($request->hasFile($file['name'])) {
+                    $thumbnailImagenPath = null;
                     $uploadedFile = $request->file($file['name']);
-                    $this->processFile($webContent, $decodedData, $uploadedFile, $file['name'], $file['type']);
+                    if ($file['name'] == 'imagen1' || $file['name'] == 'imagen2') {
+                        $thumbnailImagenPath = ImageHelper::saveReducedImage(
+                            $uploadedFile,
+                            "storage/web_content_home/",
+                        );
+                    }
+                    $this->processFile($webContent, $decodedData, $uploadedFile, $thumbnailImagenPath, $file['name'], $file['type']);
                 }
             }
 
@@ -228,12 +249,23 @@ class WebContentHomeController extends Controller
                     if (isset($decodedData['images'][$index])) {
                         // Eliminar archivo existente si aplica
                         $existingImage = $decodedData['images'][$index]['img']['url'] ?? null;
+                        $existingThumbnailImage = $decodedData['images'][$index]['img']['thumbnail_url'] ?? null;
                         if ($existingImage && file_exists(public_path($existingImage))) {
                             unlink(public_path($existingImage));
                         }
 
+                        if ($existingThumbnailImage && file_exists(public_path($existingThumbnailImage)) && $existingThumbnailImage != null) {
+                            unlink(public_path($existingThumbnailImage));
+                        }
+
                         // Guardar nueva imagen
                         $uniqueFileName = uniqid() . '_' . time() . '.' . $uploadedFile->getClientOriginalExtension();
+
+                        $newThumbnailImagenPath = ImageHelper::saveReducedImage(
+                            $uploadedFile,
+                            "storage/web_content_home/",
+                        );
+
                         $directory = public_path('storage/web_content_home');
                         $path = $directory . '/' . $uniqueFileName;
 
@@ -245,6 +277,7 @@ class WebContentHomeController extends Controller
 
                         // Actualizar URL en `images`
                         $decodedData['images'][$index]['img']['url'] = "storage/web_content_home/" . $uniqueFileName;
+                        $decodedData['images'][$index]['img']['thumbnail_url'] = $newThumbnailImagenPath;
                     }
                 }
             }
@@ -261,7 +294,7 @@ class WebContentHomeController extends Controller
     /**
      * Procesa un archivo estándar (imagen o video).
      */
-    private function processFile($webContent, &$decodedData, $uploadedFile, $fileName, $fileType)
+    private function processFile($webContent, &$decodedData, $uploadedFile, $thumbnailImagenPath, $fileName, $fileType)
     {
         // Eliminar archivo existente (si lo hay)
         $existingFile = WebContentHomeFile::where('id_web_content_home', $webContent->id)
@@ -270,8 +303,12 @@ class WebContentHomeController extends Controller
 
         if ($existingFile) {
             $existingFilePath = public_path($existingFile->path);
+            $existingFileThumbnailPath = public_path($existingFile->thumbnail_path);
             if (file_exists($existingFilePath)) {
                 unlink($existingFilePath);
+            }
+            if (file_exists($existingFileThumbnailPath) && $existingFile->thumbnail_path != null) {
+                unlink($existingFileThumbnailPath);
             }
             $existingFile->delete();
         }
@@ -293,12 +330,14 @@ class WebContentHomeController extends Controller
             'name' => $fileName,
             'type' => $fileType,
             'path' => "storage/web_content_home/" . $uniqueFileName,
+            'thumbnail_path' => $thumbnailImagenPath,
         ]);
 
         // Actualizar el JSON
         foreach ($decodedData['files'] as &$fileData) {
             if ($fileData['name'] === $fileName) {
                 $fileData['file'] = "storage/web_content_home/" . $uniqueFileName;
+                $fileData['thumbnail_file'] = $thumbnailImagenPath;
                 break;
             }
         }
