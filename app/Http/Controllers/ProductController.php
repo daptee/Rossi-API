@@ -1186,6 +1186,9 @@ class ProductController extends Controller
                 if ($product->main_img && file_exists(public_path($product->main_img))) {
                     unlink(public_path($product->main_img));
                 }
+                if ($product->thumbnail_main_img && file_exists(public_path($product->thumbnail_main_img))) {
+                    unlink(public_path($product->thumbnail_main_img));
+                }
             } catch (Exception $e) {
                 Log::error("Error al eliminar la imagen principal: " . $e->getMessage());
             }
@@ -1193,6 +1196,9 @@ class ProductController extends Controller
             try {
                 if ($product->sub_img && file_exists(public_path($product->sub_img))) {
                     unlink(public_path($product->sub_img));
+                }
+                if ($product->thumbnail_sub_img && file_exists(public_path($product->thumbnail_sub_img))) {
+                    unlink(public_path($product->thumbnail_sub_img));
                 }
             } catch (Exception $e) {
                 Log::error("Error al eliminar la imagen secundaria: " . $e->getMessage());
@@ -1222,6 +1228,9 @@ class ProductController extends Controller
                     if (file_exists(public_path($galleryItem->file))) {
                         unlink(public_path($galleryItem->file));
                     }
+                    if (file_exists(public_path($galleryItem->thumbnail_file))) {
+                        unlink(public_path($galleryItem->thumbnail_file));
+                    }
                     $galleryItem->delete(); // Eliminar el registro en la base de datos
                 } catch (Exception $e) {
                     Log::error("Error al eliminar imagen de galería: " . $e->getMessage());
@@ -1234,6 +1243,9 @@ class ProductController extends Controller
                     if ($attribute->pivot->img && file_exists(public_path($attribute->pivot->img))) {
                         unlink(public_path($attribute->pivot->img));
                     }
+                    if ($attribute->pivot->thumbnail_img && file_exists(public_path($attribute->pivot->thumbnail_img))) {
+                        unlink(public_path($attribute->pivot->thumbnail_img));
+                    }
                 } catch (Exception $e) {
                     Log::error("Error al eliminar imagen de atributo: " . $e->getMessage());
                 }
@@ -1244,6 +1256,9 @@ class ProductController extends Controller
                 try {
                     if ($material->pivot->img && file_exists(public_path($material->pivot->img))) {
                         unlink(public_path($material->pivot->img));
+                    }
+                    if ($material->pivot->thumbnail_img && file_exists(public_path($material->pivot->thumbnail_img))) {
+                        unlink(public_path($material->pivot->thumbnail_img));
                     }
                 } catch (Exception $e) {
                     Log::error("Error al eliminar imagen de material: " . $e->getMessage());
