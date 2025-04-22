@@ -19,6 +19,7 @@ class GalleryWebContentAbout extends Model
     protected $fillable = [
         'id_web_content_about', // Asegúrate de incluir esta columna en la base de datos
         'file',
+        'thumbnail_file',
     ];
 
     // Si no necesitas timestamps personalizados, puedes deshabilitarlos (opcional)

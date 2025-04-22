@@ -713,7 +713,7 @@ class ProductController extends Controller
                     if ($product->main_img && file_exists(public_path($product->main_img))) {
                         unlink(public_path($product->main_img));
                     }
-                    if ($product->main_img && file_exists(public_path($product->thumbnail_main_img))) {
+                    if ($product->main_img && file_exists(public_path($product->thumbnail_main_img)) && $product->thumbnail_main_img != null) {
                         unlink(public_path($product->thumbnail_main_img));
                     }
                     $product->main_img = null;
@@ -722,7 +722,7 @@ class ProductController extends Controller
                     if ($product->main_img && file_exists(public_path($product->main_img))) {
                         unlink(public_path($product->main_img));
                     }
-                    if ($product->main_img && file_exists(public_path($product->thumbnail_main_img))) {
+                    if ($product->main_img && file_exists(public_path($product->thumbnail_main_img)) && $product->thumbnail_main_img != null) {
                         unlink(public_path($product->thumbnail_main_img));
                     }
 
@@ -744,7 +744,7 @@ class ProductController extends Controller
                     if ($product->sub_img && file_exists(public_path($product->sub_img))) {
                         unlink(public_path($product->sub_img));
                     }
-                    if ($product->sub_img && file_exists(public_path($product->thumbnail_sub_img))) {
+                    if ($product->sub_img && file_exists(public_path($product->thumbnail_sub_img)) && $product->thumbnail_sub_img != null) {
                         unlink(public_path($product->thumbnail_sub_img));
                     }
                     $product->sub_img = null;
@@ -753,7 +753,7 @@ class ProductController extends Controller
                     if ($product->sub_img && file_exists(public_path($product->sub_img))) {
                         unlink(public_path($product->sub_img));
                     }
-                    if ($product->sub_img && file_exists(public_path($product->thumbnail_sub_img))) {
+                    if ($product->sub_img && file_exists(public_path($product->thumbnail_sub_img)) && $product->thumbnail_sub_img != null) {
                         unlink(public_path($product->thumbnail_sub_img));
                     }
 
@@ -854,7 +854,7 @@ class ProductController extends Controller
                             unlink(public_path($gallery->file));
                         }
                         
-                        if (file_exists(public_path($gallery->thumbnail_file))) {
+                        if (file_exists(public_path($gallery->thumbnail_file)) && $gallery->thumbnail_file != null) {
                             unlink(public_path($gallery->thumbnail_file));
                         }
 
@@ -899,7 +899,7 @@ class ProductController extends Controller
                         if (file_exists(public_path($gallery->file))) {
                             unlink(public_path($gallery->file));
                         }
-                        if (file_exists(public_path($gallery->thumbnail_file))) {
+                        if (file_exists(public_path($gallery->thumbnail_file)) && $gallery->thumbnail_file !== null) {
                             unlink(public_path($gallery->thumbnail_file));
                         }
 
@@ -919,7 +919,7 @@ class ProductController extends Controller
                     if (file_exists(public_path($gallery->file))) {
                         unlink(public_path($gallery->file));
                     }
-                    if (file_exists(public_path($gallery->thumbnail_file))) {
+                    if (file_exists(public_path($gallery->thumbnail_file)) && $gallery->thumbnail_file !== null) {
                         unlink(public_path($gallery->thumbnail_file));
                     }
 
@@ -938,7 +938,7 @@ class ProductController extends Controller
                         unlink(public_path($material->img));
                     }
 
-                    if ($material->img && file_exists(public_path($material->thumbnail_img))) {
+                    if ($material->img && file_exists(public_path($material->thumbnail_img)) && $material->thumbnail_img !== null) {
                         unlink(public_path($material->thumbnail_img));
                     }
 
@@ -958,7 +958,7 @@ class ProductController extends Controller
                             unlink(public_path($existingMaterial->img));
                         }
                         
-                        if ($existingMaterial->img && file_exists(public_path($existingMaterial->thumbnail_img))) {
+                        if ($existingMaterial->img && file_exists(public_path($existingMaterial->thumbnail_img)) && $existingMaterial->thumbnail_img !== null) {
                             unlink(public_path($existingMaterial->thumbnail_img));
                         }
                         // Eliminar el material del producto
@@ -983,7 +983,7 @@ class ProductController extends Controller
                                 unlink(public_path($existingMaterial->img));
                             }
 
-                            if ($existingMaterial->img && file_exists(public_path($existingMaterial->thumbnail_img))) {
+                            if ($existingMaterial->img && file_exists(public_path($existingMaterial->thumbnail_img)) && $existingMaterial->thumbnail_img !== null) {
                                 unlink(public_path($existingMaterial->thumbnail_img));
                             }
 
@@ -1004,7 +1004,7 @@ class ProductController extends Controller
                                 unlink(public_path($existingMaterial->img));
                             }
 
-                            if ($existingMaterial->img && file_exists(public_path($existingMaterial->thumbnail_img))) {
+                            if ($existingMaterial->img && file_exists(public_path($existingMaterial->thumbnail_img)) && $existingMaterial->thumbnail_img !== null) {
                                 unlink(public_path($existingMaterial->thumbnail_img));
                             }
                             $materialImgPath = null; // Se elimina la referencia a la imagen
@@ -1057,7 +1057,7 @@ class ProductController extends Controller
                             unlink(public_path($attributeInstance->img));
                         }
 
-                        if ($attributeInstance->img && file_exists(public_path($attributeInstance->thumbnail_img))) {
+                        if ($attributeInstance->img && file_exists(public_path($attributeInstance->thumbnail_img)) && $attributeInstance->thumbnail_img != null) {
                             unlink(public_path($attributeInstance->thumbnail_img));
                         }
 
@@ -1084,7 +1084,7 @@ class ProductController extends Controller
                             unlink(public_path($attributeInstance->img));
                         }
 
-                        if ($attributeInstance && $attributeInstance->img && file_exists(public_path($attributeInstance->thumbnail_img))) {
+                        if ($attributeInstance && $attributeInstance->img && file_exists(public_path($attributeInstance->thumbnail_img)) && $attributeInstance->thumbnail_img != null) {
                             unlink(public_path($attributeInstance->thumbnail_img));
                         }
                         $attributeImgPath = null;
@@ -1094,7 +1094,7 @@ class ProductController extends Controller
                         if ($attributeInstance && $attributeInstance->img && file_exists(public_path($attributeInstance->img))) {
                             unlink(public_path($attributeInstance->img));
                         }
-                        if ($attributeInstance && $attributeInstance->img && file_exists(public_path($attributeInstance->thumbnail_img))) {
+                        if ($attributeInstance && $attributeInstance->img && file_exists(public_path($attributeInstance->thumbnail_img)) && $attributeInstance->thumbnail_img != null) {
                             unlink(public_path($attributeInstance->thumbnail_img));
                         }
                         $attributeThumbnailPath = ImageHelper::saveReducedImage(
@@ -1127,7 +1127,7 @@ class ProductController extends Controller
                         unlink(public_path($attributeInstance->img));
                     }
 
-                    if ($attributeInstance->img && file_exists(public_path($attributeInstance->thumbnail_img))) {
+                    if ($attributeInstance->img && file_exists(public_path($attributeInstance->thumbnail_img)) && $attributeInstance->thumbnail_img != null) {
                         unlink(public_path($attributeInstance->thumbnail_img));
                     }
 
@@ -1186,7 +1186,7 @@ class ProductController extends Controller
                 if ($product->main_img && file_exists(public_path($product->main_img))) {
                     unlink(public_path($product->main_img));
                 }
-                if ($product->thumbnail_main_img && file_exists(public_path($product->thumbnail_main_img))) {
+                if ($product->thumbnail_main_img && file_exists(public_path($product->thumbnail_main_img)) && $product->thumbnail_main_img != null) {
                     unlink(public_path($product->thumbnail_main_img));
                 }
             } catch (Exception $e) {
@@ -1197,7 +1197,7 @@ class ProductController extends Controller
                 if ($product->sub_img && file_exists(public_path($product->sub_img))) {
                     unlink(public_path($product->sub_img));
                 }
-                if ($product->thumbnail_sub_img && file_exists(public_path($product->thumbnail_sub_img))) {
+                if ($product->thumbnail_sub_img && file_exists(public_path($product->thumbnail_sub_img)) && $product->thumbnail_sub_img != null) {
                     unlink(public_path($product->thumbnail_sub_img));
                 }
             } catch (Exception $e) {
@@ -1228,7 +1228,7 @@ class ProductController extends Controller
                     if (file_exists(public_path($galleryItem->file))) {
                         unlink(public_path($galleryItem->file));
                     }
-                    if (file_exists(public_path($galleryItem->thumbnail_file))) {
+                    if (file_exists(public_path($galleryItem->thumbnail_file)) && $galleryItem->thumbnail_file != null) {
                         unlink(public_path($galleryItem->thumbnail_file));
                     }
                     $galleryItem->delete(); // Eliminar el registro en la base de datos
@@ -1243,7 +1243,7 @@ class ProductController extends Controller
                     if ($attribute->pivot->img && file_exists(public_path($attribute->pivot->img))) {
                         unlink(public_path($attribute->pivot->img));
                     }
-                    if ($attribute->pivot->thumbnail_img && file_exists(public_path($attribute->pivot->thumbnail_img))) {
+                    if ($attribute->pivot->thumbnail_img && file_exists(public_path($attribute->pivot->thumbnail_img)) && $attribute->pivot->thumbnail_img != null) {
                         unlink(public_path($attribute->pivot->thumbnail_img));
                     }
                 } catch (Exception $e) {
@@ -1257,7 +1257,7 @@ class ProductController extends Controller
                     if ($material->pivot->img && file_exists(public_path($material->pivot->img))) {
                         unlink(public_path($material->pivot->img));
                     }
-                    if ($material->pivot->thumbnail_img && file_exists(public_path($material->pivot->thumbnail_img))) {
+                    if ($material->pivot->thumbnail_img && file_exists(public_path($material->pivot->thumbnail_img)) && $material->pivot->thumbnail_img != null) {
                         unlink(public_path($material->pivot->thumbnail_img));
                     }
                 } catch (Exception $e) {
