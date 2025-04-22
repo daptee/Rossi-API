@@ -3,6 +3,7 @@
 namespace App\Helpers;
 
 use Illuminate\Support\Str;
+use Log;
 
 class ImageHelper
 {
@@ -11,6 +12,8 @@ class ImageHelper
         if (!$imageFile || !$imageFile->isValid()) {
             throw new \Exception("Archivo de imagen no válido");
         }
+
+        Log::info($path);
 
         $originalName = $imageFile->getClientOriginalName();
         $extension = strtolower($imageFile->getClientOriginalExtension());
