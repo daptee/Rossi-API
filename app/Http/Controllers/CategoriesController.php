@@ -148,6 +148,8 @@ class CategoriesController extends Controller
                     $fileKey = 'file_' . $i;
                     if ($request->hasFile($fileKey)) {
                         $fileName = time() . '_' . $request->file($fileKey)->getClientOriginalName();
+                        
+                        $thumbnailFile = null;
                         $thumbnailFile = ImageHelper::saveReducedImage(
                             $request->file($fileKey),
                             'storage/categories/grid/'
@@ -295,10 +297,13 @@ class CategoriesController extends Controller
 
                         // Guardar el nuevo archivo
                         $fileName = time() . '_' . $request->file($fileField)->getClientOriginalName();
-                        $newThumbnailFile = ImageHelper::saveReducedImage(
-                            $request->file($fileField),
-                            'storage/categories/grid/'
-                        );
+                        $newThumbnailFile = null;
+                        if ($newGridItem['props']['type'] == "Imagen") {
+                            $newThumbnailFile = ImageHelper::saveReducedImage(
+                                $request->file($fileField),
+                                'storage/categories/grid/'
+                            );
+                        }
                         $request->file($fileField)->move(public_path('storage/categories/grid/'), $fileName);
 
                         // Actualizar la URL del archivo en la nueva `grid`

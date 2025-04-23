@@ -13,7 +13,7 @@ class ImageHelper
             throw new \Exception("Archivo de imagen no válido");
         }
 
-        Log::info($path);
+        Log::info("imagennn thu...". $imageFile);
 
         $originalName = $imageFile->getClientOriginalName();
         $extension = strtolower($imageFile->getClientOriginalExtension());
@@ -33,6 +33,8 @@ class ImageHelper
         $scale = $newWidth / $width;
         $newHeight = intval($height * $scale);
 
+        Log::info("extension...". $extension);
+
         // Crear imagen desde el archivo original
         switch ($extension) {
             case 'jpeg':
@@ -46,7 +48,7 @@ class ImageHelper
                 $srcImage = imagecreatefromgif($sourcePath);
                 break;
             default:
-                throw new \Exception("Formato de imagen no soportado");
+                return null;
         }
 
         // Crear imagen nueva con tamaño reducido
