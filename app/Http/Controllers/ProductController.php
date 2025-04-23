@@ -28,7 +28,7 @@ class ProductController extends Controller
             $perPage = $request->query('per_page', 300000000);
 
             // Consulta inicial
-            $query = Product::select('products.id', 'products.name', 'products.main_img', 'products.sub_img', 'products.status', 'products.featured', 'product_status.status_name', 'products.sku', 'products.slug', 'products.meta_data', 'products.created_at')
+            $query = Product::select('products.id', 'products.name', 'products.main_img', 'products.thumbnail_main_img', 'products.sub_img', 'products.thumbnail_main_img', 'products.status', 'products.featured', 'product_status.status_name', 'products.sku', 'products.slug', 'products.meta_data', 'products.created_at')
                 ->join('product_status', 'products.status', '=', 'product_status.id')
                 ->with(['categories.parent', 'materials', 'attributes', 'gallery', 'components'])
                 ->withCount(['categories', 'materials', 'attributes', 'gallery', 'components']);
@@ -76,7 +76,9 @@ class ProductController extends Controller
                     'name' => $product->name,
                     'sku' => $product->sku,
                     'main_img' => $product->main_img,
+                    'thumbnail_main_img' => $product->thumbnail_main_img,
                     'sub_img' => $product->sub_img,
+                    'thumbnail_sub_img' => $product->thumbnail_sub_img,
                     'status' => [
                         'id' => $product->status,
                         'status_name' => $product->status_name,
@@ -143,7 +145,9 @@ class ProductController extends Controller
                     'description_italic',
                     'description_underline',
                     'main_img',
+                    'thumbnail_main_img',
                     'sub_img',
+                    'thumbnail_sub_img',
                     'main_video',
                     'file_data_sheet',
                     'status',
@@ -243,7 +247,7 @@ class ProductController extends Controller
                 'gallery',
                 'components'
             ])
-                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'sub_img', 'main_video', 'file_data_sheet', 'status', 'featured', 'meta_data')
+                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'thumbnail_main_img', 'sub_img', 'thumbnail_sub_img', 'main_video', 'file_data_sheet', 'status', 'featured', 'meta_data')
                 ->findOrFail($id);
 
             // Limpia los datos del pivot para cada relación
@@ -303,7 +307,7 @@ class ProductController extends Controller
                 'gallery',
                 'components'
             ])
-                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'sub_img', 'main_video', 'file_data_sheet', 'status', 'featured', 'meta_data')
+                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'thumbnail_main_img', 'sub_img', 'thumbnail_sub_img', 'main_video', 'file_data_sheet', 'status', 'featured', 'meta_data')
                 ->where('sku', $sku)
                 ->firstOrFail();
 
@@ -389,7 +393,7 @@ class ProductController extends Controller
                 $product->products = [];
             } else {
                 // Buscar productos relacionados que contengan alguna de las palabras filtradas
-                $relatedProducts = Product::select('id', 'name', 'slug', 'sku', 'main_img')
+                $relatedProducts = Product::select('id', 'name', 'slug', 'sku', 'main_img', 'thumbnail_main_img')
                     ->where(function ($query) use ($productNameWords) {
                         foreach ($productNameWords as $word) {
                             $query->orWhereRaw('LOWER(name) REGEXP ?', ["\\b" . preg_quote($word) . "\\b"]);

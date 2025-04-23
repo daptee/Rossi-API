@@ -148,6 +148,10 @@ class CategoriesController extends Controller
                     $fileKey = 'file_' . $i;
                     if ($request->hasFile($fileKey)) {
                         $fileName = time() . '_' . $request->file($fileKey)->getClientOriginalName();
+                        $thumbnailFile = ImageHelper::saveReducedImage(
+                            $request->file($fileKey),
+                            'storage/categories/grid/'
+                        );
                         $request->file($fileKey)->move($baseStoragePath . 'grid/', $fileName);
                         $fileUrl = 'storage/categories/grid/' . $fileName;
 
@@ -156,6 +160,7 @@ class CategoriesController extends Controller
                         foreach ($decodedGrid as &$gridItem) {
                             if ($gridItem['id'] === $gridItemId) {
                                 $gridItem['props']['file']['url'] = $fileUrl;
+                                $gridItem['props']['file']['thumbnail_url'] = $thumbnailFile;
                                 break;
                             }
                         }
@@ -194,6 +199,7 @@ class CategoriesController extends Controller
                                 'sku' => $product->sku,
                                 'description' => $product->description,
                                 'main_img' => $product->main_img,
+                                'thumbnail_main_img' => $product->thumbnail_main_img,
                                 'featured' => $product->featured
                                 // Agrega otros campos que deseas mostrar
                             ];
@@ -289,10 +295,15 @@ class CategoriesController extends Controller
 
                         // Guardar el nuevo archivo
                         $fileName = time() . '_' . $request->file($fileField)->getClientOriginalName();
+                        $newThumbnailFile = ImageHelper::saveReducedImage(
+                            $request->file($fileField),
+                            'storage/categories/grid/'
+                        );
                         $request->file($fileField)->move(public_path('storage/categories/grid/'), $fileName);
 
                         // Actualizar la URL del archivo en la nueva `grid`
                         $newGridItem['props']['file']['url'] = 'storage/categories/grid/' . $fileName;
+                        $newGridItem['props']['file']['thumbnail_url'] = $newThumbnailFile;
                     } /* elseif ($existingFileUrl && !isset($newGridItem['props']['file']['url'])) {
                      // Si no se envía un archivo nuevo pero había uno antiguo, eliminar el archivo antiguo
                      $this->deleteFile($existingFileUrl);
