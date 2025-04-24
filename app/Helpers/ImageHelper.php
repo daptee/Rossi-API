@@ -48,7 +48,8 @@ class ImageHelper
                 $srcImage = imagecreatefromgif($sourcePath);
                 break;
             default:
-                return null;
+                $srcImage = imagecreatefromjpeg($sourcePath);
+                break;
         }
 
         // Crear imagen nueva con tamaño reducido
