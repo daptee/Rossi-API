@@ -28,7 +28,7 @@ class ImageHelper
         [$width, $height] = getimagesize($sourcePath);
 
         // Nuevo ancho deseado
-        $newWidth = 800;
+        $newWidth = 100;
         // Escalar proporcionalmente
         $scale = $newWidth / $width;
         $newHeight = intval($height * $scale);
