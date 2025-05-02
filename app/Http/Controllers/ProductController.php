@@ -647,13 +647,14 @@ class ProductController extends Controller
             $productMaterialMap = [];
             if ($request->has('materials_values')) {
                 foreach ($request->materials_values as $index => $material) {
-                    $mainImgThumbnailPath = null;
+                    $materialImgThumbnailPath = null;
                     if (isset($material['img']) && $request->hasFile("materials_values.$index.img")) {
                         $materialImgThumbnailPath = ImageHelper::saveReducedImage(
                             $request->file("materials_values.$index.img"),
                             "storage/products/materials/",
                         );
-                    };
+                    }
+                    ;
                     $materialImgPath = isset($material['img']) && $request->hasFile("materials_values.$index.img")
                         ? $request->file("materials_values.$index.img")->move("$baseStoragePath/materials", uniqid() . '_' . $request->file("materials_values.$index.img")->getClientOriginalName())
                         : null;
@@ -694,12 +695,14 @@ class ProductController extends Controller
             $productAttributeMap = [];
             if ($request->has('attributes_values')) {
                 foreach ($request->attributes_values as $index => $attribute) {
+                    $attributeImgThumbnailPath = null;
                     if (isset($attribute['img']) && $request->hasFile("attributes_values.$index.img")) {
                         $attributeImgThumbnailPath = ImageHelper::saveReducedImage(
                             $request->file("attributes_values.$index.img"),
                             "storage/products/attributes/",
                         );
-                    };
+                    }
+                    ;
                     $attributeImgPath = isset($attribute['img']) && $request->hasFile("attributes_values.$index.img")
                         ? $request->file("attributes_values.$index.img")->move("$baseStoragePath/attributes", uniqid() . '_' . $request->file("attributes_values.$index.img")->getClientOriginalName())
                         : null;
@@ -809,6 +812,14 @@ class ProductController extends Controller
                 'attributes_values' => 'array',
                 'attributes_values.*.id_attribute_value' => 'required|integer|exists:attribute_values,id',
                 'attributes_values.*.img' => 'nullable',
+                'product_material_value' => 'array',
+                'product_material_value.*.id' => 'nullable|integer|exists:product_material_value,id',
+                'product_material_value.*.id_material_value' => 'nullable|integer|exists:material_values,id',
+                'product_material_value.*.img' => 'nullable|file|mimes:jpg,jpeg,png,webp',
+                'product_attribute_value' => 'array',
+                'product_attribute_value.*.id' => 'nullable|integer|exists:product_attribute_value,id',
+                'product_attribute_value.*.id_attribute_value' => 'nullable|integer|exists:attribute_values,id',
+                'product_attribute_value.*.img' => 'nullable|file|mimes:jpg,jpeg,png,webp',
                 'components' => 'array',
                 'components.*' => 'integer|exists:components,id',
             ]);
@@ -1161,6 +1172,79 @@ class ProductController extends Controller
                 }
             }
 
+            $existingValues = ProductMaterialValue::where('id_product', $product->id)->get();
+            $existingIds = $existingValues->pluck('id')->toArray(); // estos son los id reales (PK)
+
+            $productMaterialMap = ProductMaterial::where('id_product', $product->id)
+                ->pluck('id', 'id_material') // [id_material => id_product_material_value]
+                ->toArray();
+
+            $sentIds = [];
+
+            if ($request->has('product_material_value')) {
+                foreach ($request->product_material_value as $index => $materialValue) {
+                    // Verificamos si existe el valor de mapeo
+                    if (!isset($productMaterialMap[$materialValue['id_material_value']])) {
+                        continue;
+                    }
+
+                    $productMaterialId = $productMaterialMap[$materialValue['id_material_value']];
+                    $imgPath = null;
+                    $thumbnailPath = null;
+
+                    $value = null;
+                    if (isset($materialValue['id'])) {
+                        $value = ProductMaterialValue::find($materialValue['id']);
+                        $sentIds[] = $value->id;
+                        $imgPath = $value->img;
+                        $thumbnailPath = $value->thumbnail_img;
+                    }
+
+                    // Subida de imagen
+                    if ($request->hasFile("product_material_value.$index.img")) {
+                        if ($value) {
+                            if ($value->img && file_exists(public_path($value->img))) {
+                                unlink(public_path($value->img));
+                            }
+                            if ($value->thumbnail_img && file_exists(public_path($value->thumbnail_img))) {
+                                unlink(public_path($value->thumbnail_img));
+                            }
+                        }
+
+                        $file = $request->file("product_material_value.$index.img");
+                        $uniqueName = uniqid() . '_' . $file->getClientOriginalName();
+
+                        $thumbnailPath = ImageHelper::saveReducedImage($file, "storage/products/materials/");
+                        $storedPath = $file->move(public_path('storage/products/materials'), $uniqueName);
+                        $imgPath = 'storage/products/materials/' . $uniqueName;
+                    }
+
+                    // Crear o actualizar
+                    ProductMaterialValue::updateOrCreate(
+                        ['id' => $materialValue['id'] ?? 0], // Si no hay ID, lo crea
+                        [
+                            'id_product' => $product->id,
+                            'id_product_material_value' => $productMaterialId,
+                            'img' => $imgPath,
+                            'thumbnail_img' => $thumbnailPath
+                        ]
+                    );
+                }
+            }
+
+            // Eliminar los que no vinieron
+            foreach ($existingValues as $value) {
+                if (!in_array($value->id, $sentIds)) {
+                    if ($value->img && file_exists(public_path($value->img))) {
+                        unlink(public_path($value->img));
+                    }
+                    if ($value->thumbnail_img && file_exists(public_path($value->thumbnail_img))) {
+                        unlink(public_path($value->thumbnail_img));
+                    }
+                    $value->delete();
+                }
+            }
+
             // Actualizar atributos asociados
             if ($request->has('attributes_values')) {
                 // Obtener los ids de los atributos existentes en el producto
@@ -1263,6 +1347,90 @@ class ProductController extends Controller
                     $attributeInstance->delete();
                 }
             }
+
+            $existingValues = ProductAttributeValue::where('id_product', $product->id)->get();
+            $existingIds = $existingValues->pluck('id')->toArray();
+
+            $productAttributeMap = ProductAttribute::where('id_product', $product->id)
+                ->pluck('id', 'id_attribute_value') // [id_attribute => id_product_attribute]
+                ->toArray();
+
+            $sentIds = [];
+
+            Log::info($productAttributeMap);
+
+            if ($request->has('product_attribute_value')) {
+                foreach ($request->product_attribute_value as $index => $attributeValue) {
+                    // Verificamos si existe el valor de mapeo
+                    if (!isset($productAttributeMap[$attributeValue['id_attribute_value']])) {
+                        continue;
+                    }
+
+                    Log::info("aquiii");
+                    Log::info($productAttributeMap[$attributeValue['id_attribute_value']]);
+
+                    $productAttributeId = $productAttributeMap[$attributeValue['id_attribute_value']];
+                    Log::info("productAttributeId");
+                    Log::info($productAttributeId);
+                    $imgPath = null;
+                    $thumbnailPath = null;
+
+                    $value = null;
+                    if (isset($attributeValue['id'])) {
+                        $value = ProductAttributeValue::find($attributeValue['id']);
+                        $sentIds[] = $value->id;
+                        $imgPath = $value->img;
+                        $thumbnailPath = $value->thumbnail_img;
+                    }
+
+                    // Subida de imagen
+                    if ($request->hasFile("product_attribute_value.$index.img")) {
+                        if ($value) {
+                            if ($value->img && file_exists(public_path($value->img))) {
+                                unlink(public_path($value->img));
+                            }
+                            if ($value->thumbnail_img && file_exists(public_path($value->thumbnail_img))) {
+                                unlink(public_path($value->thumbnail_img));
+                            }
+                        }
+
+                        $file = $request->file("product_attribute_value.$index.img");
+                        $uniqueName = uniqid() . '_' . $file->getClientOriginalName();
+
+                        $thumbnailPath = ImageHelper::saveReducedImage($file, "storage/products/attributes/");
+                        $storedPath = $file->move(public_path('storage/products/attributes'), $uniqueName);
+                        $imgPath = 'storage/products/attributes/' . $uniqueName;
+                    }
+
+                    Log::info("product attribute 22");
+                    Log::info($productAttributeId);
+
+                    // Crear o actualizar
+                    ProductAttributeValue::updateOrCreate(
+                        ['id' => $attributeValue['id'] ?? 0],
+                        [
+                            'id_product_atribute_value' => $productAttributeId,
+                            'id_product' => $product->id,
+                            'img' => $imgPath,
+                            'thumbnail_img' => $thumbnailPath
+                        ]
+                    );
+                }
+            }
+
+            // Eliminar los que no vinieron
+            foreach ($existingValues as $value) {
+                if (!in_array($value->id, $sentIds)) {
+                    if ($value->img && file_exists(public_path($value->img))) {
+                        unlink(public_path($value->img));
+                    }
+                    if ($value->thumbnail_img && file_exists(public_path($value->thumbnail_img))) {
+                        unlink(public_path($value->thumbnail_img));
+                    }
+                    $value->delete();
+                }
+            }
+
 
             // Actualizar componentes asociados
             $product->components()->sync($request->components ?? []);
