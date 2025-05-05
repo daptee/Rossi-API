@@ -15,4 +15,13 @@ class AttributeValue extends Model
     {
         return $this->belongsTo(Attribute::class, 'id_attribute');
     }
+
+    public function files()
+    {
+        return $this->hasMany(
+            ProductAttributeValue::class,
+            'id_product_atribute_value',
+            'id'
+        );
+    }
 }

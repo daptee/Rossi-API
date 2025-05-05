@@ -93,7 +93,9 @@ CREATE TABLE product_components (
 
 ALTER TABLE products
 ADD COLUMN thumbnail_main_img VARCHAR(255) AFTER main_img,
-ADD COLUMN thumbnail_sub_img VARCHAR(255) AFTER sub_img;
+ADD COLUMN thumbnail_sub_img VARCHAR(255) AFTER sub_img,
+ADD COLUMN customizable BOOLEAN DEFAULT FALSE AFTER sub_img,
+ADD COLUMN 3d_file VARCHAR(255) AFTER sub_img;
 
 ALTER TABLE product_galleries
 ADD COLUMN thumbnail_file VARCHAR(255) AFTER file;
@@ -103,3 +105,41 @@ ADD COLUMN thumbnail_img VARCHAR(255) AFTER img;
 
 ALTER TABLE product_attributes
 ADD COLUMN thumbnail_img VARCHAR(255) AFTER img;
+
+-- Tabla de atributos padre de productos 3d
+CREATE TABLE product_parent_attribute (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_product INT,
+    id_attribute INT,
+    3d_file VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_product) REFERENCES products(id) ON DELETE CASCADE,
+    FOREIGN KEY (id_attribute) REFERENCES attributes(id) ON DELETE CASCADE
+);
+
+-- Tabla de atributos value de productos
+CREATE TABLE product_attribute_value (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_product_atribute_value INT,
+    id_product INT,
+    img VARCHAR(255) DEFAULT NULL,
+    thumbnail_img VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_product_atribute_value) REFERENCES product_attributes(id) ON DELETE CASCADE,
+    FOREIGN KEY (id_product) REFERENCES products(id) ON DELETE CASCADE
+);
+
+-- Tabla de materiales value de productos
+CREATE TABLE product_material_value (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_product_material_value INT,
+    id_product INT,
+    img VARCHAR(255) DEFAULT NULL,
+    thumbnail_img VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_product_material_value) REFERENCES product_materials(id) ON DELETE CASCADE,
+    FOREIGN KEY (id_product) REFERENCES products(id) ON DELETE CASCADE
+);
