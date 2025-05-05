@@ -795,6 +795,8 @@ class ProductController extends Controller
                 'description_underline' => 'nullable|required|in:1,0',
                 'status' => 'required|integer|exists:product_status,id',
                 'main_img' => 'nullable',
+                'customizable' => 'nullable|boolean',
+                '3d_file' => 'nullable|file|mimes:glb,gltf,zip|max:50480',
                 'sub_img' => 'nullable',
                 'main_video' => 'nullable',
                 'file_data_sheet' => 'nullable',
@@ -806,6 +808,9 @@ class ProductController extends Controller
                 'gallery.*.id' => 'sometimes|exists:product_galleries,id',
                 'gallery.*.file' => 'nullable',
                 'gallery.*' => 'nullable',
+                'attribute_3d' => 'array',
+                'attribute_3d.*.id_attribute' => 'nullable|integer|exists:attributes,id',
+                'attribute_3d.*.file' => 'nullable|file|mimes:glb,gltf,zip|max:50480',
                 'materials_values' => 'array',
                 'materials_values.*.id_material_value' => 'required|integer|exists:material_values,id',
                 'materials_values.*.img' => 'nullable',
@@ -845,6 +850,8 @@ class ProductController extends Controller
                 mkdir("$baseStoragePath/materials", 0755, true);
             if (!file_exists("$baseStoragePath/attributes"))
                 mkdir("$baseStoragePath/attributes", 0755, true);
+            if (!file_exists("$baseStoragePath/3d/attributes"))
+                mkdir("$baseStoragePath/3d/attributes", 0755, true);
 
             // Manejo de main_img
             if ($request->has('main_img')) {
@@ -1063,6 +1070,82 @@ class ProductController extends Controller
                     }
 
                     $gallery->delete();
+                }
+            }
+
+            $base3DFilePath = null;
+
+            if ($request->hasFile('3d_file') && $request->customizable == 1) {
+                // Eliminar archivo anterior si existe
+                if ($product['3d_file'] && file_exists(public_path($product['3d_file']))) {
+                    unlink(public_path($product['3d_file']));
+                }
+
+                $uniqueName = uniqid() . '_' . $request->file('3d_file')->getClientOriginalName();
+                $base3DFilePath = $request->file('3d_file')->move("$baseStoragePath/3d", $uniqueName);
+
+                $product->update([
+                    '3d_file' => "storage/products/3d/" . basename($base3DFilePath),
+                ]);
+            }
+
+            if ($request->customizable == 0) {
+                $product->update([
+                    'customizable' => 0,
+                    '3d_file' => null,
+                ]);
+            }
+
+            // Manejo de archivos 3D por atributo
+            if ($request->has('attribute_3d')) {
+                $sentAttributeIds = [];
+                
+                foreach ($request->attribute_3d as $index => $attribute3D) {
+                    if (isset($attribute3D['id_attribute'])) {
+                        $sentAttributeIds[] = $attribute3D['id_attribute']; // Guardamos los que vienen
+            
+                        // Buscamos el registro existente
+                        $existingRecord = ProductParentAttribute::where('id_product', $product->id)
+                            ->where('id_attribute', $attribute3D['id_attribute'])
+                            ->first();
+            
+                        $filePath = $existingRecord['3d_file'] ?? null;
+            
+                        if ($request->hasFile("attribute_3d.$index.file")) {
+                            $file = $request->file("attribute_3d.$index.file");
+                            $uniqueName = uniqid() . '_' . $file->getClientOriginalName();
+                            $storedPath = $file->move("$baseStoragePath/3d/attributes", $uniqueName);
+                            $filePath = "storage/products/3d/attributes/" . basename($storedPath);
+            
+                            // Eliminamos el archivo anterior si existe
+                            if ($existingRecord && $existingRecord['3d_file'] && file_exists(public_path($existingRecord['3d_file']))) {
+                                unlink(public_path($existingRecord['3d_file']));
+                            }
+                        }
+            
+                        if ($existingRecord) {
+                            $existingRecord->update([
+                                '3d_file' => $filePath,
+                            ]);
+                        } else {
+                            ProductParentAttribute::create([
+                                'id_product' => $product->id,
+                                'id_attribute' => $attribute3D['id_attribute'],
+                                '3d_file' => $filePath,
+                            ]);
+                        }
+                    }
+                }
+            
+                // 🔁 Eliminamos los que ya no vinieron
+                $existingAttributes = ProductParentAttribute::where('id_product', $product->id)->get();
+                foreach ($existingAttributes as $record) {
+                    if (!in_array($record->id_attribute, $sentAttributeIds)) {
+                        if ($record['3d_file'] && file_exists(public_path($record['3d_file']))) {
+                            unlink(public_path($record['3d_file']));
+                        }
+                        $record->delete();
+                    }
                 }
             }
 
