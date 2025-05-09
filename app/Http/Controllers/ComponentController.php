@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\ImageHelper;
 use App\Models\Component;
 use App\Http\Responses\ApiResponse;
 use Illuminate\Http\Request;
@@ -92,6 +93,10 @@ class ComponentController extends Controller
             $imgPath = null;
             if ($request->hasFile('img')) {
                 $fileName = time() . '_' . $request->file('img')->getClientOriginalName();
+                $imgPathThumbnail = ImageHelper::saveReducedImage(
+                    $request->file('img'),
+                    'storage/components/images/'
+                );
                 $request->file('img')->move($baseStoragePath, $fileName);
                 $imgPath = 'storage/components/images/' . $fileName;
             }
@@ -104,6 +109,7 @@ class ComponentController extends Controller
                 'name' => $request->name,
                 'description' => $request->description,
                 'img' => $imgPath,
+                'thumbnail_img' => $imgPathThumbnail,
                 'status' => $request->status,
                 'id_category' => 1,
                 'meta_data' => $decodedMetaData,
@@ -111,18 +117,30 @@ class ComponentController extends Controller
 
             // Procesar subcomponentes
             if ($request->has('subComponents')) {
-                foreach ($request->subComponents as $subComponentData) {
+                foreach ($request->subComponents as $index => $subComponentData) {
                     $subImgPath = null;
-                    if (isset($subComponentData['img'])) {
-                        $fileName = time() . '_' . $subComponentData['img']->getClientOriginalName();
-                        $subComponentData['img']->move($baseStoragePath, $fileName);
+                    $subImgPathThumb = null;
+                    if ($request->hasFile("subComponents.$index.img")) {
+                        $imgFile = $request->file("subComponents.$index.img");
+            
+                        $fileName = time() . '_' . $imgFile->getClientOriginalName();
+            
+                        $subImgPathThumbnail = ImageHelper::saveReducedImage(
+                            $imgFile,
+                            'storage/components/images/'
+                        );
+            
+                        $imgFile->move($baseStoragePath, $fileName);
+            
                         $subImgPath = 'storage/components/images/' . $fileName;
+                        $subImgPathThumb = $subImgPathThumbnail;
                     }
 
                     $component->children()->create([
                         'name' => $subComponentData['name'],
                         'description' => $subComponentData['description'] ?? null,
                         'img' => $subImgPath,
+                        'thumbnail_img' => $subImgPathThumb,
                         'status' => $subComponentData['status'],
                         'id_category' => 1,
                     ]);
@@ -136,8 +154,6 @@ class ComponentController extends Controller
             return ApiResponse::create('Error al crear el componente', 500, ['error' => $e->getMessage()]);
         }
     }
-
-
     public function update(Request $request, $id)
     {
         try {
@@ -177,16 +193,31 @@ class ComponentController extends Controller
                     if ($component->img && file_exists(public_path($component->img))) {
                         unlink(public_path($component->img));
                     }
+                    if ($component->thumbnail_img && file_exists(public_path($component->thumbnail_img))) {
+                        unlink(public_path($component->thumbnail_img));
+                    }
                     $component->img = null;
+                    $component->thumbnail_img = null;
                 } elseif ($request->hasFile('img')) {
                     // Reemplazar imagen actual
                     if ($component->img && file_exists(public_path($component->img))) {
                         unlink(public_path($component->img));
                     }
+                    
+                    if ($component->thumbnail_img && file_exists(public_path($component->thumbnail_img))) {
+                        unlink(public_path($component->thumbnail_img));
+                    }
 
                     $fileName = time() . '_' . $request->file('img')->getClientOriginalName();
+                    Log::info('holaaaaaaaaaaaaaaaaaaaa'. $fileName);
+                    Log::info($request->file('img'));
+                    $imgPathThumbnail = ImageHelper::saveReducedImage(
+                        $request->file('img'),
+                        'storage/components/images/'
+                    );
                     $request->file('img')->move($baseStoragePath, $fileName);
                     $component->img = 'storage/components/images/' . $fileName;
+                    $component->thumbnail_img = $imgPathThumbnail;
                 }
             }
 
@@ -213,6 +244,9 @@ class ComponentController extends Controller
                     if ($subComponent->img && file_exists(public_path($subComponent->img))) {
                         unlink(public_path($subComponent->img));
                     }
+                    if ($subComponent->thumbnail_img && file_exists(public_path($subComponent->thumbnail_img))) {
+                        unlink(public_path($subComponent->thumbnail_img));
+                    }
                     $subComponent->delete();
                 });
 
@@ -232,10 +266,19 @@ class ComponentController extends Controller
                                     unlink(public_path($subComponent->img));
                                 }
 
+                                if ($subComponent->thumbnail_img && file_exists(public_path($subComponent->thumbnail_img))) {
+                                    unlink(public_path($subComponent->thumbnail_img));
+                                }
+
                                 // Procesar nueva imagen
                                 $fileName = time() . '_subcomponent_' . $request->file("subComponents.{$index}.img")->getClientOriginalName();
+                                $subImgPathThumbnail = ImageHelper::saveReducedImage(
+                                    $request->file("subComponents.{$index}.img"),
+                                    'storage/components/images/'
+                                );
                                 $request->file("subComponents.{$index}.img")->move($baseStoragePath, $fileName);
                                 $subComponent->img = 'storage/components/images/' . $fileName;
+                                $subComponent->thumbnail_img = $subImgPathThumbnail;
                             } elseif ($request->input("subComponents.{$index}.img") === null) {
                                 Log::info("Se recibió `null`, la imagen será eliminada.");
 
@@ -243,7 +286,11 @@ class ComponentController extends Controller
                                 if ($subComponent->img && file_exists(public_path($subComponent->img))) {
                                     unlink(public_path($subComponent->img));
                                 }
+                                if ($subComponent->thumbnail_img && file_exists(public_path($subComponent->thumbnail_img))) {
+                                    unlink(public_path($subComponent->thumbnail_img));
+                                }
                                 $subComponent->img = null;
+                                $subComponent->thumbnail_img = null;
                             } elseif (is_string($request->input("subComponents.{$index}.img"))) {
                                 Log::info("Se recibió un string, conservar la imagen actual.");
                                 // Conservar la imagen actual (no realizar ninguna acción)
@@ -263,17 +310,24 @@ class ComponentController extends Controller
                     } else {
                         // Crear nuevos subcomponentes
                         $newImgPath = null;
+                        $newImgPathThumb = null;
     
                         if ($request->hasFile("subComponents.{$index}.img")) {
                             $fileName = time() . '_subcomponent_' . $request->file("subComponents.{$index}.img")->getClientOriginalName();
+                            $newSubImgPathThumbnail = ImageHelper::saveReducedImage(
+                                $request->file("subComponents.{$index}.img"),
+                                'storage/components/images/'
+                            );
                             $request->file("subComponents.{$index}.img")->move($baseStoragePath, $fileName);
                             $newImgPath = 'storage/components/images/' . $fileName;
+                            $newImgPathThumb = $newSubImgPathThumbnail;
                         }
     
                         $component->children()->create([
                             'name' => $subComponentData['name'],
                             'description' => $subComponentData['description'] ?? '',
                             'img' => $newImgPath,
+                            'thumbnail_img' => $newImgPathThumb,
                             'status' => $subComponentData['status'] ?? 2, // Asignar un estado por defecto si no se proporciona
                             'id_category' => 1,
                         ]);

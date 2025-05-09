@@ -19,3 +19,6 @@ CREATE TABLE gallery_web_content_about (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+
+ALTER TABLE gallery_web_content_about
+ADD COLUMN thumbnail_file VARCHAR(255) AFTER file;

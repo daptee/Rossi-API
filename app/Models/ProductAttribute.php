@@ -14,6 +14,7 @@ class ProductAttribute extends Model
         'id_product',
         'id_attribute_value',
         'img',
+        'thumbnail_img',
     ];
 
     public function product()
