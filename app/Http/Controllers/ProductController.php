@@ -250,7 +250,7 @@ class ProductController extends Controller
                 'gallery',
                 'components'
             ])
-                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'thumbnail_main_img', 'sub_img', 'thumbnail_sub_img', 'main_video', 'file_data_sheet', 'status', 'featured', 'meta_data')
+                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'thumbnail_main_img', 'sub_img', 'thumbnail_sub_img', 'customizable', '3d_file', 'main_video', 'file_data_sheet', 'status', 'featured', 'meta_data')
                 ->findOrFail($id);
 
             // Limpia los datos del pivot para cada relación
@@ -486,7 +486,7 @@ class ProductController extends Controller
                 'main_img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
                 'sub_img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
                 'customizable' => 'nullable|boolean',
-                '3d_file' => 'nullable|file|mimes:glb,gltf,zip|max:50480',
+                '3d_file' => 'nullable|file|max:50480',
                 'main_video' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
                 'file_data_sheet' => 'nullable|file|mimes:pdf|max:5120',
                 'featured' => 'nullable|boolean',
@@ -796,7 +796,7 @@ class ProductController extends Controller
                 'status' => 'required|integer|exists:product_status,id',
                 'main_img' => 'nullable',
                 'customizable' => 'nullable|boolean',
-                '3d_file' => 'nullable|file|mimes:glb,gltf,zip|max:50480',
+                '3d_file' => 'nullable|file|max:50480',
                 'sub_img' => 'nullable',
                 'main_video' => 'nullable',
                 'file_data_sheet' => 'nullable',
