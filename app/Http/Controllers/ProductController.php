@@ -820,11 +820,11 @@ class ProductController extends Controller
                 'product_material_value' => 'array',
                 'product_material_value.*.id' => 'nullable|integer|exists:product_material_value,id',
                 'product_material_value.*.id_material_value' => 'nullable|integer|exists:material_values,id',
-                'product_material_value.*.img' => 'nullable|file|mimes:jpg,jpeg,png,webp',
+                'product_material_value.*.img' => 'nullable',
                 'product_attribute_value' => 'array',
                 'product_attribute_value.*.id' => 'nullable|integer|exists:product_attribute_value,id',
                 'product_attribute_value.*.id_attribute_value' => 'nullable|integer|exists:attribute_values,id',
-                'product_attribute_value.*.img' => 'nullable|file|mimes:jpg,jpeg,png,webp',
+                'product_attribute_value.*.img' => 'nullable',
                 'components' => 'array',
                 'components.*' => 'integer|exists:components,id',
             ]);
