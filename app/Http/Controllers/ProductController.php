@@ -1085,6 +1085,7 @@ class ProductController extends Controller
                 $base3DFilePath = $request->file('3d_file')->move("$baseStoragePath/3d", $uniqueName);
 
                 $product->update([
+                    'customizable' => 1,
                     '3d_file' => "storage/products/3d/" . basename($base3DFilePath),
                 ]);
             }
