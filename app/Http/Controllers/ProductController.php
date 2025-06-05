@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Helpers\ImageHelper;
 use App\Http\Responses\ApiResponse;
+use App\Models\Product3DModel;
 use App\Models\ProductAttributeValue;
 use App\Models\ProductComponent;
 use App\Models\ProductMaterialValue;
@@ -248,7 +249,8 @@ class ProductController extends Controller
                 'materials.material',
                 'attributes.attribute',
                 'gallery',
-                'components'
+                'components',
+                'product3DModels'
             ])
                 ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'thumbnail_main_img', 'sub_img', 'thumbnail_sub_img', 'customizable', '3d_file', 'main_video', 'file_data_sheet', 'status', 'featured', 'meta_data')
                 ->findOrFail($id);
@@ -259,14 +261,12 @@ class ProductController extends Controller
             });
 
             $product->materials->each(function ($material) {
-                $material->id_product_material_value = $material->pivot->id;
                 $material->img_value = $material->pivot->img;
                 $material->thumbnail_img_value = $material->pivot->thumbnail_img;
                 unset($material->pivot);
             });
 
             $product->attributes->each(function ($attribute) {
-                $attribute->id_product_atribute_value = $attribute->pivot->id;
                 $attribute->img = $attribute->pivot->img;
                 $attribute->thumbnail_img = $attribute->pivot->thumbnail_img;
                 unset($attribute->pivot);
@@ -278,32 +278,7 @@ class ProductController extends Controller
 
             // Reorganiza los parent_attributes3d por id_attribute para fácil acceso
             $attributes3D = [];
-            foreach ($product->parentAttributes3d as $attr3D) {
-                $attributes3D[$attr3D->id_attribute] = $attr3D->file_3d ?? $attr3D->{"3d_file"};
-            }
 
-            // Inserta 3d_file dentro del atributo correspondiente
-            $product->attributes->each(function ($attribute) use ($attributes3D) {
-                if (isset($attributes3D[$attribute->id_attribute])) {
-                    $attribute->attribute->file_3d = $attributes3D[$attribute->id_attribute];
-                } else {
-                    $attribute->attribute->file_3d = null;
-                }
-            });
-
-            $attributeFilesGrouped = $product->attributeFiles->groupBy('id_product_atribute_value');
-
-            // Añadir el array 'file' a cada attribute
-            $product->attributes->each(function ($attribute) use ($attributeFilesGrouped) {
-                $attribute->files = $attributeFilesGrouped->get($attribute->id_product_atribute_value, collect())->values();
-            });
-
-            $materialFilesGrouped = $product->materialFiles->groupBy('id_product_material_value');
-
-            // Añadir el array 'file' a cada material
-            $product->materials->each(function ($material) use ($materialFilesGrouped) {
-                $material->files = $materialFilesGrouped->get($material->id_product_material_value, collect())->values();
-            });
 
 
             // Obtener el nombre del estado del producto desde la tabla product_status
@@ -485,8 +460,6 @@ class ProductController extends Controller
                 'status' => 'required|integer|exists:product_status,id',
                 'main_img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
                 'sub_img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
-                'customizable' => 'nullable|boolean',
-                '3d_file' => 'nullable|file|max:50480',
                 'main_video' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
                 'file_data_sheet' => 'nullable|file|mimes:pdf|max:5120',
                 'featured' => 'nullable|boolean',
@@ -501,15 +474,10 @@ class ProductController extends Controller
                 'attributes_values' => 'array',
                 'attributes_values.*.id_attribute_value' => 'required|integer|exists:attribute_values,id',
                 'attributes_values.*.img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
-                'attribute_3d' => 'array',
-                'attribute_3d.*.id_attribute' => 'required|integer|exists:attributes,id',
-                'attribute_3d.*.file' => 'nullable|file|max:50480',
-                'product_attribute_value' => 'array',
-                'product_attribute_value.*.id_attribute_value' => 'required|integer|exists:attribute_values,id',
-                'product_attribute_value.*.img' => 'required|file|mimes:jpg,jpeg,png,webp',
-                'product_material_value' => 'array',
-                'product_material_value.*.id_material_value' => 'required|integer|exists:material_values,id',
-                'product_material_value.*.img' => 'required|file|mimes:jpg,jpeg,png,webp',
+                '3d_files' => 'array',
+                '3d_files.*.name_file' => 'required|string|max:100',
+                '3d_files.*.glb_file' => 'required|file',
+                '3d_files.*.data' => 'required|json',
                 'components' => 'array',
                 'components.*' => 'integer|exists:components,id',
             ]);
@@ -611,31 +579,6 @@ class ProductController extends Controller
                 }
             }
 
-            $base3DFilePath = null;
-            if ($request->hasFile('3d_file') && $request->customizable == 1) {
-                $uniqueName = uniqid() . '_' . $request->file('3d_file')->getClientOriginalName();
-                $base3DFilePath = $request->file('3d_file')->move("$baseStoragePath/3d", $uniqueName);
-                $product->update([
-                    '3d_file' => "storage/products/3d/" . basename($base3DFilePath),
-                ]);
-            }
-
-            if ($request->has('attribute_3d')) {
-                foreach ($request->attribute_3d as $index => $attribute3D) {
-                    if (isset($attribute3D['file']) && $request->hasFile("attribute_3d.$index.file")) {
-                        $file = $request->file("attribute_3d.$index.file");
-                        $uniqueName = uniqid() . '_' . $file->getClientOriginalName();
-                        $storedPath = $file->move("$baseStoragePath/3d/attributes", $uniqueName);
-
-                        ProductParentAttribute::create([
-                            'id_product' => $product->id,
-                            'id_attribute' => $attribute3D['id_attribute'],
-                            '3d_file' => "storage/products/3d/attributes/" . basename($storedPath),
-                        ]);
-                    }
-                }
-            }
-
             // Asociar categorías al producto
             if ($request->has('categories')) {
                 foreach ($request->categories as $categoryId) {
@@ -670,27 +613,6 @@ class ProductController extends Controller
                 }
             }
 
-            if ($request->has('product_material_value')) {
-                foreach ($request->product_material_value as $index => $materialValue) {
-                    if ($request->hasFile("product_material_value.$index.img")) {
-                        $file = $request->file("product_material_value.$index.img");
-                        $materialValueImgThumbnailPath = ImageHelper::saveReducedImage(
-                            $request->file("product_material_value.$index.img"),
-                            "storage/products/materials/",
-                        );
-                        $uniqueName = uniqid() . '_' . $file->getClientOriginalName();
-                        $storedPath = $file->move(public_path('storage/products/materials'), $uniqueName);
-
-                        ProductMaterialValue::create([
-                            'id_product_material_value' => $productMaterialMap[$materialValue['id_material_value']],
-                            'id_product' => $product->id,
-                            'img' => 'storage/products/materials/' . basename($storedPath),
-                            'thumbnail_img' => $materialValueImgThumbnailPath ? $materialValueImgThumbnailPath : null,
-                        ]);
-                    }
-                }
-            }
-
             // Guardar atributos asociados
             $productAttributeMap = [];
             if ($request->has('attributes_values')) {
@@ -718,24 +640,90 @@ class ProductController extends Controller
                 }
             }
 
-            if ($request->has('product_attribute_value')) {
-                foreach ($request->product_attribute_value as $index => $attributeValue) {
-                    if ($request->hasFile("product_attribute_value.$index.img")) {
-                        $file = $request->file("product_attribute_value.$index.img");
-                        $attributeValueImgThumbnailPath = ImageHelper::saveReducedImage(
-                            $request->file("product_attribute_value.$index.img"),
-                            "storage/products/attributes/",
-                        );
-                        $uniqueName = uniqid() . '_' . $file->getClientOriginalName();
-                        $storedPath = $file->move(public_path('storage/products/attributes'), $uniqueName);
+            if ($request->has('3d_files') && is_array($request->input('3d_files'))) {
+                foreach ($request->input('3d_files') as $index => $fileData) {
+                    // Obtener archivo glb y estructura
+                    $glbFile = $request->file("3d_files.$index.glb_file");
+                    $structureJson = $fileData['data'];
+                    $structure = json_decode($structureJson, true);
 
-                        ProductAttributeValue::create([
-                            'id_product_atribute_value' => $productAttributeMap[$attributeValue['id_attribute_value']],
-                            'id_product' => $product->id,
-                            'img' => 'storage/products/attributes/' . basename($storedPath),
-                            'thumbnail_img' => $attributeValueImgThumbnailPath ? $attributeValueImgThumbnailPath : null,
-                        ]);
+                    // Guardar archivo .glb
+                    $glbPath = $glbFile->move("$baseStoragePath/3d", uniqid() . '_' . $glbFile->getClientOriginalName());
+                    $glbPath = "storage/products/3d/" . basename($glbPath);
+
+                    // Obtener todos los archivos cargados
+                    $allFiles = $request->file('3d_files');
+
+                    // Procesar atributos
+                    if (isset($structure['attributes'])) {
+                        foreach ($structure['attributes'] as &$attribute) {
+                            foreach ($attribute['values'] as &$value) {
+                                Log::info('Processing attribute value', ['attribute' => $attribute, 'value' => $value]);
+
+                                $imageKey = "attribute_{$attribute['id']}_value_{$value['id']}";
+                                $images = $allFiles[$index]['images'][$imageKey] ?? null;
+
+                                Log::info('Image key:', ['key' => $imageKey]);
+                                Log::info('Images:', ['images' => $images]);
+
+                                $paths = [];
+
+                                if (is_array($images)) {
+                                    foreach ($images as $image) {
+                                        $moved = $image->move("$baseStoragePath/3d/attributes", uniqid() . '_' . $image->getClientOriginalName());
+                                        $paths[] = "storage/products/3d/attributes/" . basename($moved->getPathname());
+                                    }
+                                } elseif ($images instanceof \Illuminate\Http\UploadedFile) {
+                                    $moved = $images->move("$baseStoragePath/3d/attributes", uniqid() . '_' . $images->getClientOriginalName());
+                                    $paths[] = "storage/products/3d/attributes/" . basename($moved->getPathname());
+                                }
+
+                                Log::info('Paths:', ['paths' => $paths]);
+
+                                $value['images'] = $paths;
+
+                                Log::info('Updated value with images', ['value' => $value]);
+                            }
+                        }
                     }
+
+                    // Procesar materiales
+                    if (isset($structure['materials'])) {
+                        foreach ($structure['materials'] as &$material) {
+                            foreach ($material['values'] as &$value) {
+                                $imageKey = "material_{$material['id']}_value_{$value['id']}";
+                                $images = $allFiles[$index]['images'][$imageKey] ?? null;
+
+                                Log::info('Material image key:', ['key' => $imageKey]);
+                                Log::info('Material images:', ['images' => $images]);
+
+                                $paths = [];
+
+                                if (is_array($images)) {
+                                    foreach ($images as $image) {
+                                        $moved = $image->move("$baseStoragePath/3d/materials", uniqid() . '_' . $image->getClientOriginalName());
+                                        $paths[] = "storage/products/3d/materials/" . basename($moved->getPathname());
+                                    }
+                                } elseif ($images instanceof \Illuminate\Http\UploadedFile) {
+                                    $moved = $images->move("$baseStoragePath/3d/materials", uniqid() . '_' . $images->getClientOriginalName());
+                                    $paths[] = "storage/products/3d/materials/" . basename($moved->getPathname());
+                                }
+
+                                $value['images'] = $paths;
+                                Log::info('Updated material value with images', ['value' => $value]);
+                            }
+                        }
+                    }
+
+                    // Guardar modelo 3D
+                    $model = Product3DModel::create([
+                        'id_product' => $product->id,
+                        'name' => $fileData['name_file'],
+                        'glb_file_path' => $glbPath,
+                        'data' => $structure
+                    ]);
+
+                    $models[] = $model;
                 }
             }
 
@@ -795,8 +783,6 @@ class ProductController extends Controller
                 'description_underline' => 'nullable|required|in:1,0',
                 'status' => 'required|integer|exists:product_status,id',
                 'main_img' => 'nullable',
-                'customizable' => 'nullable|boolean',
-                '3d_file' => 'nullable|file|max:50480',
                 'sub_img' => 'nullable',
                 'main_video' => 'nullable',
                 'file_data_sheet' => 'nullable',
@@ -808,23 +794,18 @@ class ProductController extends Controller
                 'gallery.*.id' => 'sometimes|exists:product_galleries,id',
                 'gallery.*.file' => 'nullable',
                 'gallery.*' => 'nullable',
-                'attribute_3d' => 'array',
-                'attribute_3d.*.id_attribute' => 'nullable|integer|exists:attributes,id',
-                'attribute_3d.*.file' => 'nullable|file|max:50480',
                 'materials_values' => 'array',
                 'materials_values.*.id_material_value' => 'required|integer|exists:material_values,id',
                 'materials_values.*.img' => 'nullable',
                 'attributes_values' => 'array',
                 'attributes_values.*.id_attribute_value' => 'required|integer|exists:attribute_values,id',
                 'attributes_values.*.img' => 'nullable',
-                'product_material_value' => 'array',
-                'product_material_value.*.id' => 'nullable|integer|exists:product_material_value,id',
-                'product_material_value.*.id_material_value' => 'nullable|integer|exists:material_values,id',
-                'product_material_value.*.img' => 'nullable',
-                'product_attribute_value' => 'array',
-                'product_attribute_value.*.id' => 'nullable|integer|exists:product_attribute_value,id',
-                'product_attribute_value.*.id_attribute_value' => 'nullable|integer|exists:attribute_values,id',
-                'product_attribute_value.*.img' => 'nullable',
+                '3d_files' => 'array',
+                '3d_files.*.name_file' => 'required|string|max:100',
+                '3d_files.*.glb_file' => 'nullable|file',
+                '3d_files.*.data' => 'required|json',
+                '3d_files.*.id' => 'sometimes|integer|exists:product_3d_models,id',
+                'deleted_3d_files' => 'nullable|array',
                 'components' => 'array',
                 'components.*' => 'integer|exists:components,id',
             ]);
@@ -1073,82 +1054,6 @@ class ProductController extends Controller
                 }
             }
 
-            $base3DFilePath = null;
-
-            if ($request->hasFile('3d_file') && $request->customizable == 1) {
-                // Eliminar archivo anterior si existe
-                if ($product['3d_file'] && file_exists(public_path($product['3d_file']))) {
-                    unlink(public_path($product['3d_file']));
-                }
-
-                $uniqueName = uniqid() . '_' . $request->file('3d_file')->getClientOriginalName();
-                $base3DFilePath = $request->file('3d_file')->move("$baseStoragePath/3d", $uniqueName);
-
-                $product->update([
-                    'customizable' => 1,
-                    '3d_file' => "storage/products/3d/" . basename($base3DFilePath),
-                ]);
-            }
-
-            if ($request->customizable == 0) {
-                $product->update([
-                    'customizable' => 0,
-                    '3d_file' => null,
-                ]);
-            }
-
-            // Manejo de archivos 3D por atributo
-            if ($request->has('attribute_3d')) {
-                $sentAttributeIds = [];
-                
-                foreach ($request->attribute_3d as $index => $attribute3D) {
-                    if (isset($attribute3D['id_attribute'])) {
-                        $sentAttributeIds[] = $attribute3D['id_attribute']; // Guardamos los que vienen
-            
-                        // Buscamos el registro existente
-                        $existingRecord = ProductParentAttribute::where('id_product', $product->id)
-                            ->where('id_attribute', $attribute3D['id_attribute'])
-                            ->first();
-            
-                        $filePath = $existingRecord['3d_file'] ?? null;
-            
-                        if ($request->hasFile("attribute_3d.$index.file")) {
-                            $file = $request->file("attribute_3d.$index.file");
-                            $uniqueName = uniqid() . '_' . $file->getClientOriginalName();
-                            $storedPath = $file->move("$baseStoragePath/3d/attributes", $uniqueName);
-                            $filePath = "storage/products/3d/attributes/" . basename($storedPath);
-            
-                            // Eliminamos el archivo anterior si existe
-                            if ($existingRecord && $existingRecord['3d_file'] && file_exists(public_path($existingRecord['3d_file']))) {
-                                unlink(public_path($existingRecord['3d_file']));
-                            }
-                        }
-            
-                        if ($existingRecord) {
-                            $existingRecord->update([
-                                '3d_file' => $filePath,
-                            ]);
-                        } else {
-                            ProductParentAttribute::create([
-                                'id_product' => $product->id,
-                                'id_attribute' => $attribute3D['id_attribute'],
-                                '3d_file' => $filePath,
-                            ]);
-                        }
-                    }
-                }
-            
-                // 🔁 Eliminamos los que ya no vinieron
-                $existingAttributes = ProductParentAttribute::where('id_product', $product->id)->get();
-                foreach ($existingAttributes as $record) {
-                    if (!in_array($record->id_attribute, $sentAttributeIds)) {
-                        if ($record['3d_file'] && file_exists(public_path($record['3d_file']))) {
-                            unlink(public_path($record['3d_file']));
-                        }
-                        $record->delete();
-                    }
-                }
-            }
 
             // Actualizar materiales asociados
             if (!$request->has('materials_values') || empty($request->materials_values)) {
@@ -1256,79 +1161,6 @@ class ProductController extends Controller
                 }
             }
 
-            $existingValues = ProductMaterialValue::where('id_product', $product->id)->get();
-            $existingIds = $existingValues->pluck('id')->toArray(); // estos son los id reales (PK)
-
-            $productMaterialMap = ProductMaterial::where('id_product', $product->id)
-                ->pluck('id', 'id_material') // [id_material => id_product_material_value]
-                ->toArray();
-
-            $sentIds = [];
-
-            if ($request->has('product_material_value')) {
-                foreach ($request->product_material_value as $index => $materialValue) {
-                    // Verificamos si existe el valor de mapeo
-                    if (!isset($productMaterialMap[$materialValue['id_material_value']])) {
-                        continue;
-                    }
-
-                    $productMaterialId = $productMaterialMap[$materialValue['id_material_value']];
-                    $imgPath = null;
-                    $thumbnailPath = null;
-
-                    $value = null;
-                    if (isset($materialValue['id'])) {
-                        $value = ProductMaterialValue::find($materialValue['id']);
-                        $sentIds[] = $value->id;
-                        $imgPath = $value->img;
-                        $thumbnailPath = $value->thumbnail_img;
-                    }
-
-                    // Subida de imagen
-                    if ($request->hasFile("product_material_value.$index.img")) {
-                        if ($value) {
-                            if ($value->img && file_exists(public_path($value->img))) {
-                                unlink(public_path($value->img));
-                            }
-                            if ($value->thumbnail_img && file_exists(public_path($value->thumbnail_img))) {
-                                unlink(public_path($value->thumbnail_img));
-                            }
-                        }
-
-                        $file = $request->file("product_material_value.$index.img");
-                        $uniqueName = uniqid() . '_' . $file->getClientOriginalName();
-
-                        $thumbnailPath = ImageHelper::saveReducedImage($file, "storage/products/materials/");
-                        $storedPath = $file->move(public_path('storage/products/materials'), $uniqueName);
-                        $imgPath = 'storage/products/materials/' . $uniqueName;
-                    }
-
-                    // Crear o actualizar
-                    ProductMaterialValue::updateOrCreate(
-                        ['id' => $materialValue['id'] ?? 0], // Si no hay ID, lo crea
-                        [
-                            'id_product' => $product->id,
-                            'id_product_material_value' => $productMaterialId,
-                            'img' => $imgPath,
-                            'thumbnail_img' => $thumbnailPath
-                        ]
-                    );
-                }
-            }
-
-            // Eliminar los que no vinieron
-            foreach ($existingValues as $value) {
-                if (!in_array($value->id, $sentIds)) {
-                    if ($value->img && file_exists(public_path($value->img))) {
-                        unlink(public_path($value->img));
-                    }
-                    if ($value->thumbnail_img && file_exists(public_path($value->thumbnail_img))) {
-                        unlink(public_path($value->thumbnail_img));
-                    }
-                    $value->delete();
-                }
-            }
-
             // Actualizar atributos asociados
             if ($request->has('attributes_values')) {
                 // Obtener los ids de los atributos existentes en el producto
@@ -1432,89 +1264,145 @@ class ProductController extends Controller
                 }
             }
 
-            $existingValues = ProductAttributeValue::where('id_product', $product->id)->get();
-            $existingIds = $existingValues->pluck('id')->toArray();
+            if ($request->has('3d_files') && is_array($request->input('3d_files'))) {
+                foreach ($request->input('3d_files') as $index => $fileData) {
+                    $glbFile = $request->file("3d_files.$index.glb_file");
+                    $structureJson = $fileData['data'];
+                    $structure = json_decode($structureJson, true);
+                    $modelId = $fileData['id'] ?? null;
 
-            $productAttributeMap = ProductAttribute::where('id_product', $product->id)
-                ->pluck('id', 'id_attribute_value') // [id_attribute => id_product_attribute]
-                ->toArray();
+                    // Buscar modelo existente o crear uno nuevo
+                    $model = $modelId ? Product3DModel::find($modelId) : new Product3DModel();
 
-            $sentIds = [];
+                    // Actualizar nombre del archivo
+                    $model->name = $fileData['name_file'];
+                    $model->id_product = $product->id;
 
-            Log::info($productAttributeMap);
-
-            if ($request->has('product_attribute_value')) {
-                foreach ($request->product_attribute_value as $index => $attributeValue) {
-                    // Verificamos si existe el valor de mapeo
-                    if (!isset($productAttributeMap[$attributeValue['id_attribute_value']])) {
-                        continue;
+                    // Si hay archivo glb nuevo, lo actualizamos
+                    if ($glbFile) {
+                        $glbPath = $glbFile->move("$baseStoragePath/3d", uniqid() . '_' . $glbFile->getClientOriginalName());
+                        $model->glb_file_path = "storage/products/3d/" . basename($glbPath);
                     }
 
-                    Log::info("aquiii");
-                    Log::info($productAttributeMap[$attributeValue['id_attribute_value']]);
+                    $allFiles = $request->file('3d_files');
 
-                    $productAttributeId = $productAttributeMap[$attributeValue['id_attribute_value']];
-                    Log::info("productAttributeId");
-                    Log::info($productAttributeId);
-                    $imgPath = null;
-                    $thumbnailPath = null;
+                    // Procesar imágenes de atributos
+                    if (isset($structure['attributes'])) {
+                        foreach ($structure['attributes'] as &$attribute) {
+                            foreach ($attribute['values'] as &$value) {
+                                $imageKey = "attribute_{$attribute['id']}_value_{$value['id']}";
+                                $images = $allFiles[$index]['images'][$imageKey] ?? null;
 
-                    $value = null;
-                    if (isset($attributeValue['id'])) {
-                        $value = ProductAttributeValue::find($attributeValue['id']);
-                        $sentIds[] = $value->id;
-                        $imgPath = $value->img;
-                        $thumbnailPath = $value->thumbnail_img;
-                    }
+                                $paths = [];
 
-                    // Subida de imagen
-                    if ($request->hasFile("product_attribute_value.$index.img")) {
-                        if ($value) {
-                            if ($value->img && file_exists(public_path($value->img))) {
-                                unlink(public_path($value->img));
+                                if (is_array($images)) {
+                                    foreach ($images as $image) {
+                                        $moved = $image->move("$baseStoragePath/3d/attributes", uniqid() . '_' . $image->getClientOriginalName());
+                                        $paths[] = "storage/products/3d/attributes/" . basename($moved->getPathname());
+                                    }
+                                } elseif ($images instanceof \Illuminate\Http\UploadedFile) {
+                                    $moved = $images->move("$baseStoragePath/3d/attributes", uniqid() . '_' . $images->getClientOriginalName());
+                                    $paths[] = "storage/products/3d/attributes/" . basename($moved->getPathname());
+                                }
+
+                                // Fusionar imágenes nuevas con las existentes si hay
+                                if (!empty($paths)) {
+                                    $existingImages = $value['images'] ?? [];
+                                    $value['images'] = array_merge($existingImages, $paths);
+                                }
                             }
-                            if ($value->thumbnail_img && file_exists(public_path($value->thumbnail_img))) {
-                                unlink(public_path($value->thumbnail_img));
+                        }
+                    }
+
+                    // Procesar imágenes de materiales
+                    if (isset($structure['materials'])) {
+                        foreach ($structure['materials'] as &$material) {
+                            foreach ($material['values'] as &$value) {
+                                $imageKey = "material_{$material['id']}_value_{$value['id']}";
+                                $images = $allFiles[$index]['images'][$imageKey] ?? null;
+
+                                $paths = [];
+
+                                if (is_array($images)) {
+                                    foreach ($images as $image) {
+                                        $moved = $image->move("$baseStoragePath/3d/materials", uniqid() . '_' . $image->getClientOriginalName());
+                                        $paths[] = "storage/products/3d/materials/" . basename($moved->getPathname());
+                                    }
+                                } elseif ($images instanceof \Illuminate\Http\UploadedFile) {
+                                    $moved = $images->move("$baseStoragePath/3d/materials", uniqid() . '_' . $image->getClientOriginalName());
+                                    $paths[] = "storage/products/3d/materials/" . basename($moved->getPathname());
+                                }
+
+                                // Fusionar imágenes nuevas con las existentes si hay
+                                if (!empty($paths)) {
+                                    $existingImages = $value['images'] ?? [];
+                                    $value['images'] = array_merge($existingImages, $paths);
+                                }
+                            }
+                        }
+                    }
+
+
+                    // Guardar estructura actualizada
+                    $model->data = $structure;
+                    $model->save();
+
+                    $models[] = $model;
+                }
+            }
+
+            if ($request->has('deleted_3d_files') && is_array($request->deleted_3d_files)) {
+                foreach ($request->deleted_3d_files as $idToDelete) {
+                    $model = Product3DModel::find($idToDelete);
+
+                    if ($model) {
+                        // Eliminar archivo .glb
+                        if ($model->glb_file_path) {
+                            $glbPath = public_path($model->glb_file_path);
+                            if (file_exists($glbPath)) {
+                                unlink($glbPath);
                             }
                         }
 
-                        $file = $request->file("product_attribute_value.$index.img");
-                        $uniqueName = uniqid() . '_' . $file->getClientOriginalName();
+                        $structure = $model->data;
 
-                        $thumbnailPath = ImageHelper::saveReducedImage($file, "storage/products/attributes/");
-                        $storedPath = $file->move(public_path('storage/products/attributes'), $uniqueName);
-                        $imgPath = 'storage/products/attributes/' . $uniqueName;
+                        // Eliminar imágenes de atributos
+                        if (isset($structure['attributes'])) {
+                            foreach ($structure['attributes'] as $attribute) {
+                                foreach ($attribute['values'] as $value) {
+                                    if (isset($value['images']) && is_array($value['images'])) {
+                                        foreach ($value['images'] as $imagePath) {
+                                            $fullPath = public_path($imagePath);
+                                            if (file_exists($fullPath)) {
+                                                unlink($fullPath);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Eliminar imágenes de materiales
+                        if (isset($structure['materials'])) {
+                            foreach ($structure['materials'] as $material) {
+                                foreach ($material['values'] as $value) {
+                                    if (isset($value['images']) && is_array($value['images'])) {
+                                        foreach ($value['images'] as $imagePath) {
+                                            $fullPath = public_path($imagePath);
+                                            if (file_exists($fullPath)) {
+                                                unlink($fullPath);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Eliminar el modelo de la base de datos
+                        $model->delete();
                     }
-
-                    Log::info("product attribute 22");
-                    Log::info($productAttributeId);
-
-                    // Crear o actualizar
-                    ProductAttributeValue::updateOrCreate(
-                        ['id' => $attributeValue['id'] ?? 0],
-                        [
-                            'id_product_atribute_value' => $productAttributeId,
-                            'id_product' => $product->id,
-                            'img' => $imgPath,
-                            'thumbnail_img' => $thumbnailPath
-                        ]
-                    );
                 }
             }
-
-            // Eliminar los que no vinieron
-            foreach ($existingValues as $value) {
-                if (!in_array($value->id, $sentIds)) {
-                    if ($value->img && file_exists(public_path($value->img))) {
-                        unlink(public_path($value->img));
-                    }
-                    if ($value->thumbnail_img && file_exists(public_path($value->thumbnail_img))) {
-                        unlink(public_path($value->thumbnail_img));
-                    }
-                    $value->delete();
-                }
-            }
-
 
             // Actualizar componentes asociados
             $product->components()->sync($request->components ?? []);

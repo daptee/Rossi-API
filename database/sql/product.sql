@@ -106,6 +106,20 @@ ADD COLUMN thumbnail_img VARCHAR(255) AFTER img;
 ALTER TABLE product_attributes
 ADD COLUMN thumbnail_img VARCHAR(255) AFTER img;
 
+CREATE TABLE product_3d_models (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    id_product INT NOT NULL,
+    name VARCHAR(100),
+    glb_file_path VARCHAR(255),
+    data LONGTEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_product) REFERENCES products(id)
+);
+
+
+// eliminar tablas de abajo
+
 -- Tabla de atributos padre de productos 3d
 CREATE TABLE product_parent_attribute (
     id INT AUTO_INCREMENT PRIMARY KEY,

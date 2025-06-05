@@ -64,19 +64,9 @@ class Product extends Model
         return $this->belongsToMany(Component::class, 'product_components', 'id_product', 'id_component');
     }
 
-    public function parentAttributes3d()
+    public function product3DModels()
     {
-        return $this->hasMany(ProductParentAttribute::class, 'id_product');
-    }
-
-    public function attributeFiles()
-    {
-        return $this->hasMany(ProductAttributeValue::class, 'id_product');
-    }
-
-    public function materialFiles()
-    {
-        return $this->hasMany(ProductMaterialValue::class, 'id_product');
+        return $this->hasMany(Product3DModel::class, 'id_product');
     }
 
 }
