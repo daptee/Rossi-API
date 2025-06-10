@@ -474,6 +474,7 @@ class ProductController extends Controller
                 'attributes_values' => 'array',
                 'attributes_values.*.id_attribute_value' => 'required|integer|exists:attribute_values,id',
                 'attributes_values.*.img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
+                'customizable' => 'required|boolean',
                 '3d_files' => 'array',
                 '3d_files.*.name_file' => 'required|string|max:100',
                 '3d_files.*.glb_file' => 'required|file',
@@ -640,7 +641,10 @@ class ProductController extends Controller
                 }
             }
 
-            if ($request->has('3d_files') && is_array($request->input('3d_files'))) {
+            // verificar si es customizable, si es 1 o true, entonces guardar los modelos 3D
+
+
+            if ($request->has('3d_files') && is_array($request->input('3d_files')) && $request->has('customizable') && $request->customizable) {
                 foreach ($request->input('3d_files') as $index => $fileData) {
                     // Obtener archivo glb y estructura
                     $glbFile = $request->file("3d_files.$index.glb_file");
@@ -800,6 +804,7 @@ class ProductController extends Controller
                 'attributes_values' => 'array',
                 'attributes_values.*.id_attribute_value' => 'required|integer|exists:attribute_values,id',
                 'attributes_values.*.img' => 'nullable',
+                'customizable' => 'required|boolean',
                 '3d_files' => 'array',
                 '3d_files.*.name_file' => 'required|string|max:100',
                 '3d_files.*.glb_file' => 'nullable|file',
@@ -1264,7 +1269,7 @@ class ProductController extends Controller
                 }
             }
 
-            if ($request->has('3d_files') && is_array($request->input('3d_files'))) {
+            if ($request->has('3d_files') && is_array($request->input('3d_files')) && $request->has('customizable') && $request->customizable) {
                 foreach ($request->input('3d_files') as $index => $fileData) {
                     $glbFile = $request->file("3d_files.$index.glb_file");
                     $structureJson = $fileData['data'];
