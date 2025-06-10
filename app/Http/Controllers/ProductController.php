@@ -955,6 +955,7 @@ class ProductController extends Controller
                 'status' => $request->status,
                 'featured' => $request->featured,
                 'meta_data' => $newMetaData,
+                'customizable' => $request->customizable,
             ]);
 
             // Actualizar categorías asociadas
