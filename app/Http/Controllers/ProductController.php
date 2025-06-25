@@ -252,7 +252,7 @@ class ProductController extends Controller
                 'components',
                 'product3DModels'
             ])
-                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'thumbnail_main_img', 'sub_img', 'thumbnail_sub_img', 'customizable', '3d_file', 'main_video', 'file_data_sheet', 'status', 'featured', 'meta_data')
+                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'thumbnail_main_img', 'sub_img', 'thumbnail_sub_img', 'customizable', 'main_video', 'file_data_sheet', 'status', 'featured', 'meta_data')
                 ->findOrFail($id);
 
             // Limpia los datos del pivot para cada relación
@@ -320,9 +320,10 @@ class ProductController extends Controller
                 'materials.material',
                 'attributes.attribute',
                 'gallery',
-                'components'
+                'components',
+                'product3DModels'
             ])
-                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'thumbnail_main_img', 'sub_img', 'thumbnail_sub_img', 'main_video', 'file_data_sheet', 'status', 'featured', 'meta_data')
+                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'thumbnail_main_img', 'sub_img', 'thumbnail_sub_img', 'main_video', 'file_data_sheet', 'customizable', 'status', 'featured', 'meta_data')
                 ->where('sku', $sku)
                 ->firstOrFail();
 
@@ -953,7 +954,7 @@ class ProductController extends Controller
                 'description_italic' => $request->description_italic,
                 'description_underline' => $request->description_underline,
                 'status' => $request->status,
-                'featured' => $request->featured,
+                'featured' => $request->featured, 
                 'meta_data' => $newMetaData,
                 'customizable' => $request->customizable,
             ]);
