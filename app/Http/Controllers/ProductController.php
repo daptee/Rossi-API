@@ -312,7 +312,6 @@ class ProductController extends Controller
     public function skuProduct($sku)
     {
         try {
-            Log::info($sku);
 
             // Consulta el producto con todas las relaciones necesarias
             $product = Product::with([
@@ -325,7 +324,11 @@ class ProductController extends Controller
             ])
                 ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'thumbnail_main_img', 'sub_img', 'thumbnail_sub_img', 'main_video', 'file_data_sheet', 'customizable', 'status', 'featured', 'meta_data')
                 ->where('sku', $sku)
-                ->firstOrFail();
+                ->first();
+
+            if (!$product) {
+                return ApiResponse::create('Producto no encontrado', 404);
+            }
 
             // Limpia los datos del pivot para cada relación
             $product->categories->each(function ($category) {
@@ -954,7 +957,7 @@ class ProductController extends Controller
                 'description_italic' => $request->description_italic,
                 'description_underline' => $request->description_underline,
                 'status' => $request->status,
-                'featured' => $request->featured, 
+                'featured' => $request->featured,
                 'meta_data' => $newMetaData,
                 'customizable' => $request->customizable,
             ]);
