@@ -69,5 +69,10 @@ class Product extends Model
         return $this->hasMany(Product3DModel::class, 'id_product');
     }
 
+    public function relatedProducts()
+    {
+        return $this->hasMany(ProductsRelated::class, 'id_product');
+    }
+
 }
 
