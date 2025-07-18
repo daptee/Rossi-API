@@ -157,3 +157,13 @@ CREATE TABLE product_material_value (
     FOREIGN KEY (id_product_material_value) REFERENCES product_materials(id) ON DELETE CASCADE,
     FOREIGN KEY (id_product) REFERENCES products(id) ON DELETE CASCADE
 );
+
+CREATE TABLE products_related (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_product INT NOT NULL,
+    id_product_related INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_product) REFERENCES products(id) ON DELETE CASCADE,
+    FOREIGN KEY (id_product_related) REFERENCES products(id) ON DELETE CASCADE
+);

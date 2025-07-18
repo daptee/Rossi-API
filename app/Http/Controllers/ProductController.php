@@ -9,6 +9,7 @@ use App\Models\ProductAttributeValue;
 use App\Models\ProductComponent;
 use App\Models\ProductMaterialValue;
 use App\Models\ProductParentAttribute;
+use App\Models\ProductsRelated;
 use App\Models\ProductStatus;
 use Illuminate\Http\Request;
 use App\Models\Product;
@@ -34,8 +35,8 @@ class ProductController extends Controller
             // Consulta inicial
             $query = Product::select('products.id', 'products.name', 'products.main_img', 'products.thumbnail_main_img', 'products.sub_img', 'products.thumbnail_main_img', 'products.status', 'products.featured', 'product_status.status_name', 'products.sku', 'products.slug', 'products.meta_data', 'products.created_at')
                 ->join('product_status', 'products.status', '=', 'product_status.id')
-                ->with(['categories.parent', 'materials', 'attributes', 'gallery', 'components'])
-                ->withCount(['categories', 'materials', 'attributes', 'gallery', 'components']);
+                ->with(['categories.parent', 'materials', 'attributes', 'gallery', 'components', 'relatedProducts.related'])
+                ->withCount(['categories', 'materials', 'attributes', 'gallery', 'components', 'relatedProducts.related']);
 
             if ($category_id) {
                 $query->whereHas('categories', function ($query) use ($category_id) {
@@ -137,7 +138,8 @@ class ProductController extends Controller
                 'materials.material',
                 'attributes.attribute',
                 'gallery',
-                'components'
+                'components',
+                'relatedProducts.related'
             ])
                 ->select(
                     'id',
@@ -250,7 +252,8 @@ class ProductController extends Controller
                 'attributes.attribute',
                 'gallery',
                 'components',
-                'product3DModels'
+                'product3DModels',
+                'relatedProducts.related'
             ])
                 ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'thumbnail_main_img', 'sub_img', 'thumbnail_sub_img', 'customizable', 'main_video', 'file_data_sheet', 'status', 'featured', 'meta_data')
                 ->findOrFail($id);
@@ -320,7 +323,8 @@ class ProductController extends Controller
                 'attributes.attribute',
                 'gallery',
                 'components',
-                'product3DModels'
+                'product3DModels',
+                'relatedProducts.related'
             ])
                 ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'thumbnail_main_img', 'sub_img', 'thumbnail_sub_img', 'main_video', 'file_data_sheet', 'customizable', 'status', 'featured', 'meta_data')
                 ->where('sku', $sku)
@@ -485,6 +489,8 @@ class ProductController extends Controller
                 '3d_files.*.data' => 'required|json',
                 'components' => 'array',
                 'components.*' => 'integer|exists:components,id',
+                'products_related' => 'nullable|array',
+                'products_related.*' => 'integer|exists:products,id',
             ]);
 
             if ($validator->fails()) {
@@ -742,12 +748,23 @@ class ProductController extends Controller
                 }
             }
 
+            // Asociar productos relacionados
+            if ($request->has('products_related')) {
+                foreach ($request->products_related as $relatedProductId) {
+                    ProductsRelated::create([
+                        'id_product' => $product->id,
+                        'id_product_related' => $relatedProductId
+                    ]);
+                }
+            }
+
             $product = Product::with([
                 'categories',
                 'materials.material',
                 'attributes.attribute',
                 'gallery',
-                'components'
+                'components',
+                'relatedProducts.related'
             ])->findOrFail($product->id);
 
             // Limpiar datos del pivot para cada relación
@@ -817,6 +834,8 @@ class ProductController extends Controller
                 'deleted_3d_files' => 'nullable|array',
                 'components' => 'array',
                 'components.*' => 'integer|exists:components,id',
+                'products_related' => 'nullable|array',
+                'products_related.*' => 'integer|exists:products,id',
             ]);
 
             if ($validator->fails()) {
@@ -1414,6 +1433,18 @@ class ProductController extends Controller
                 }
             }
 
+            // Primero eliminamos los existentes
+            ProductsRelated::where('id_product', $product->id)->delete();
+
+            // Luego agregamos los nuevos, igual que en el store
+            if ($request->has('products_related')) {
+                foreach ($request->products_related as $relatedProductId) {
+                    ProductsRelated::create([
+                        'id_product' => $product->id,
+                        'id_product_related' => $relatedProductId
+                    ]);
+                }
+            }
             // Actualizar componentes asociados
             $product->components()->sync($request->components ?? []);
 
