@@ -35,8 +35,8 @@ class ProductController extends Controller
             // Consulta inicial
             $query = Product::select('products.id', 'products.name', 'products.main_img', 'products.thumbnail_main_img', 'products.sub_img', 'products.thumbnail_main_img', 'products.status', 'products.featured', 'product_status.status_name', 'products.sku', 'products.slug', 'products.meta_data', 'products.created_at')
                 ->join('product_status', 'products.status', '=', 'product_status.id')
-                ->with(['categories.parent', 'materials', 'attributes', 'gallery', 'components', 'relatedProducts.related'])
-                ->withCount(['categories', 'materials', 'attributes', 'gallery', 'components', 'relatedProducts.related']);
+                ->with(['categories.parent', 'materials', 'attributes', 'gallery', 'components', 'relatedProducts'])
+                ->withCount(['categories', 'materials', 'attributes', 'gallery', 'components', 'relatedProducts']);
 
             if ($category_id) {
                 $query->whereHas('categories', function ($query) use ($category_id) {
@@ -96,6 +96,15 @@ class ProductController extends Controller
                     'components_count' => $product->components_count,
                     'gallery_count' => $product->gallery_count,
                     'meta_data' => $product->meta_data,
+                    'related_products' => $product->relatedProducts->map(function ($related) {
+                        return [
+                            'id' => $related->related->id,
+                            'name' => $related->related->name,
+                            'sku' => $related->related->sku,
+                            'main_img' => $related->related->main_img,
+                            'thumbnail_main_img' => $related->related->thumbnail_main_img,
+                        ];
+                    }),
                     'created_date' => $product->created_at,
                 ];
             });
