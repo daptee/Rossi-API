@@ -1639,54 +1639,67 @@ class ProductController extends Controller
 
     public function generarFichaProducto(Request $request)
     {
-        // Validar los datos del form
-        $validated = $request->validate([
-            'product_title' => 'required|string|max:255',
-            'data' => 'required|string', // viene como string JSON
-            'image' => 'nullable|file|mimes:jpg,jpeg,png,webp|max:2048',
-        ]);
+        try {
+            // Validar los datos del form
+            $validated = $request->validate([
+                'product_title' => 'required|string|max:255',
+                'data' => 'required|string', // viene como string JSON
+                'image' => 'nullable|file|mimes:jpg,jpeg,png,webp|max:2048',
+            ]);
 
-        // Parsear el JSON del campo "data"
-        $sections = json_decode($validated['data'], true);
-        if (!is_array($sections)) {
-            return response()->json(['error' => 'El campo data no contiene un JSON válido.'], 400);
-        }
-
-        // Si viene imagen, la guardamos en public/pdf-ficha/
-        $imagePath = null;
-        $basePublicPath = public_path('pdf-ficha');
-        if ($request->hasFile('image')) {
-            if (!file_exists($basePublicPath)) {
-                mkdir($basePublicPath, 0777, true);
+            // Parsear el JSON del campo "data"
+            $sections = json_decode($validated['data'], true);
+            if (!is_array($sections)) {
+                return response()->json(['error' => 'El campo data no contiene un JSON válido.'], 400);
             }
 
-            $filename = time() . '_' . $request->file('image')->getClientOriginalName();
-            $request->file('image')->move($basePublicPath, $filename);
-            $imagePath = $basePublicPath . '/' . $filename;
+            // Si viene imagen, la guardamos en public/pdf-ficha/
+            $imagePath = null;
+            $basePublicPath = public_path('pdf-ficha');
+            if ($request->hasFile('image')) {
+                if (!file_exists($basePublicPath)) {
+                    mkdir($basePublicPath, 0777, true);
+                }
+
+                $filename = time() . '_' . $request->file('image')->getClientOriginalName();
+                $request->file('image')->move($basePublicPath, $filename);
+                $imagePath = $basePublicPath . '/' . $filename;
+            }
+
+            // Datos para la vista Blade
+            $data = [
+                'product_title' => $validated['product_title'],
+                'model' => $sections,
+                'image' => $imagePath,
+            ];
+
+            // Generar PDF
+            $pdf = Pdf::loadView('pdf.ficha_producto', compact('data'))
+                ->setPaper('a4', 'portrait');
+
+            $pdfOutput = $pdf->output();
+
+            // Eliminar la imagen temporal después de generar el PDF
+            if ($imagePath && file_exists($imagePath)) {
+                unlink($imagePath);
+            }
+
+            // Retornar el PDF generado para descarga
+            return response($pdfOutput)
+                ->header('Content-Type', 'application/pdf')
+                ->header('Content-Disposition', 'attachment; filename="' . $data['product_title'] . '.pdf"');
+        } catch (\Throwable $e) {
+            // Log para ver el error completo en storage/logs/laravel.log
+            Log::error('Error generando ficha de producto: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            // Mostrar error al cliente (sin romper JSON)
+            return response()->json([
+                'error' => 'Ocurrió un error al generar el PDF.',
+                'exception' => $e->getMessage(), // 🔍 Mostrar mensaje real
+                // 'trace' => $e->getTrace() // <-- podés descomentar para debug
+            ], 500);
         }
-
-        // Datos para la vista Blade
-        $data = [
-            'product_title' => $validated['product_title'],
-            'model' => $sections,
-            'image' => $imagePath,
-        ];
-
-        // Generar PDF
-        $pdf = Pdf::loadView('pdf.ficha_producto', compact('data'))
-            ->setPaper('a4', 'portrait');
-
-        // Generar el binario antes de eliminar la imagen
-        $pdfOutput = $pdf->output();
-
-        // Eliminar la imagen temporal después de generar el PDF
-        if ($imagePath && file_exists($imagePath)) {
-            unlink($imagePath);
-        }
-
-        // Retornar el PDF generado para descarga
-        return response($pdfOutput)
-            ->header('Content-Type', 'application/pdf')
-            ->header('Content-Disposition', 'attachment; filename="' . $data['product_title'] . '.pdf"');
     }
 }
