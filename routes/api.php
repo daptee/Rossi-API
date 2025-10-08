@@ -77,6 +77,7 @@ Route::group([
     Route::post('/', [ProductController::class, 'store'])->middleware('admin');
     Route::post('/{id}', [ProductController::class, 'update'])->middleware('admin');
     Route::delete('/{id}', [ProductController::class, 'destroy'])->middleware('admin');
+    Route::post('/pdf/product-customization', [ProductController::class, 'generarFichaProducto']);
 });
 
 // Rutas de distribuidores
