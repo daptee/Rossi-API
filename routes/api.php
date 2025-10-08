@@ -15,6 +15,24 @@
  use App\Http\Controllers\MaterialController;
  use App\Http\Controllers\BackupController;
  use App\Http\Controllers\CatalogController;
+ use Illuminate\Http\Request;
+
+Route::get('/install/dompdf', function (Request $request) {
+    try {
+        // Ejecuta composer desde PHP y devuelve la salida en pantalla
+        $output = shell_exec('composer require barryvdh/laravel-dompdf 2>&1');
+
+        if ($output === null) {
+            return response()->json([
+                'error' => 'No se pudo ejecutar composer. shell_exec puede estar deshabilitado o composer no está disponible.'
+            ], 500);
+        }
+
+        return response("<pre>$output</pre>");
+    } catch (\Throwable $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+});
 
 Route::get('/backup', [BackupController::class, 'createBackup'])->name('backup');
 
