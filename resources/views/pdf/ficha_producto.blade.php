@@ -28,11 +28,11 @@
 
         .product-image {
             text-align: center;
-            margin-top: 15px;
+            margin-top: 25px;
         }
 
         .product-image img {
-            width: 250px;
+            width: 300px;
         }
 
         .section-title {
@@ -53,9 +53,12 @@
         }
 
         .footer {
+            position: fixed;
+            bottom: 10px;   /* distancia desde el borde inferior */
+            left: 0;
+            right: 0;
             text-align: center;
             font-size: 11px;
-            margin-top: 40px;
         }
     </style>
 </head>
