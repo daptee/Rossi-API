@@ -1,0 +1,77 @@
+name: Deploy EB
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: us-east-1
+      EB_APP: dev-rossi-api
+      EB_ENV: dev-rossi-api-ebs-env
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # - name: Node build (Vite)
+      #   uses: actions/setup-node@v4
+      #   with:
+      #     node-version: "20"
+      # - run: |
+      #     npm ci
+      #     npm run build
+
+      - name: PHP dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y unzip php-cli php-zip
+          curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+          composer install --no-dev --optimize-autoloader
+
+      - name: Configure AWS (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Zip bundle
+        run: |
+          zip -r deploy.zip . -x ".git/*" ".github/*" "node_modules/*" "tests/*"
+
+      - name: Upload bundle to EB bucket
+        id: eb
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          EB_BUCKET="elasticbeanstalk-${{ env.AWS_REGION }}-${ACCOUNT_ID}"
+          KEY="app/${{ env.EB_APP }}/versions/${GITHUB_SHA}.zip"
+          echo "bucket=$EB_BUCKET" >> $GITHUB_OUTPUT
+          echo "key=$KEY" >> $GITHUB_OUTPUT
+          aws s3 cp deploy.zip "s3://${EB_BUCKET}/${KEY}"
+
+      - name: Create EB application version
+        run: |
+          aws elasticbeanstalk create-application-version \
+            --application-name "${{ env.EB_APP }}" \
+            --version-label "v-${{ github.sha }}" \
+            --source-bundle S3Bucket=${{ steps.eb.outputs.bucket }},S3Key=${{ steps.eb.outputs.key }} \
+            --auto-create-application
+
+      - name: Update EB environment
+        run: |
+          aws elasticbeanstalk update-environment \
+            --environment-name "${{ env.EB_ENV }}" \
+            --version-label "v-${{ github.sha }}"
+
+      - name: Wait for deployment
+        run: |
+          aws elasticbeanstalk wait environment-updated \
+            --environment-names "${{ env.EB_ENV }}"
