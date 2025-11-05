@@ -505,7 +505,7 @@ class ProductController extends Controller
                 return ApiResponse::create('Validation failed', 422, $validator->errors());
             }
 
-            if (config('filesystems.default') === 'local') {
+            if (config('filesystems.default') === 'local' || config('filesystems.default') === 'public') {
 
                 // Rutas base en la carpeta public
                 $baseStoragePath = public_path('storage/products');
@@ -851,37 +851,7 @@ class ProductController extends Controller
 
             $product = Product::findOrFail($id);
 
-            if (config('filesystems.default') === 'local') {
-
-                // Rutas base en la carpeta public
-                $baseStoragePath = public_path('storage/products');
-
-                // Asegurar que la carpeta base existe
-                if (!file_exists($baseStoragePath)) {
-                    mkdir($baseStoragePath, 0755, true);
-                }
-
-                // Luego puedes crear subcarpetas sin error
-                if (!file_exists("$baseStoragePath/images")) {
-                    mkdir("$baseStoragePath/images", 0755, true);
-                }
-
-                // Crear directorios si no existen
-                if (!file_exists("$baseStoragePath/images"))
-                    mkdir("$baseStoragePath/images", 0755, true);
-                if (!file_exists("$baseStoragePath/videos"))
-                    mkdir("$baseStoragePath/videos", 0755, true);
-                if (!file_exists("$baseStoragePath/data_sheets"))
-                    mkdir("$baseStoragePath/data_sheets", 0755, true);
-                if (!file_exists("$baseStoragePath/gallery"))
-                    mkdir("$baseStoragePath/gallery", 0755, true);
-                if (!file_exists("$baseStoragePath/materials"))
-                    mkdir("$baseStoragePath/materials", 0755, true);
-                if (!file_exists("$baseStoragePath/attributes"))
-                    mkdir("$baseStoragePath/attributes", 0755, true);
-                if (!file_exists("$baseStoragePath/3d/attributes"))
-                    mkdir("$baseStoragePath/3d/attributes", 0755, true);
-            }
+            // No need to create directories manually when using Storage facade
 
             // Manejo de main_img
             if ($request->has('main_img')) {
@@ -1636,7 +1606,7 @@ class ProductController extends Controller
                 // If using local storage, get the full path; if S3, download temporarily
                 $disk = Storage::disk(config('filesystems.default'));
 
-                if (config('filesystems.default') === 'local') {
+                if (config('filesystems.default') === 'local' || config('filesystems.default') === 'public') {
                     // Local storage - get the full path
                     $imagePath = $disk->path($storedPath);
                 } else {

@@ -82,12 +82,14 @@ class ComponentController extends Controller
                 return ApiResponse::create('Validation failed', 422, $validator->errors());
             }
 
-            // Definir la ruta base dentro de public/storage/components
-            $baseStoragePath = public_path('storage/components/images/');
+            if (config('filesystems.default') === 'local' || config('filesystems.default') === 'public') {
+                // Definir la ruta base dentro de public/storage/components
+                $baseStoragePath = public_path('storage/components/images/');
 
-            // Verificar si la carpeta existe, si no, crearla
-            if (!file_exists($baseStoragePath)) {
-                mkdir($baseStoragePath, 0777, true);
+                // Verificar si la carpeta existe, si no, crearla
+                if (!file_exists($baseStoragePath)) {
+                    mkdir($baseStoragePath, 0777, true);
+                }
             }
 
             // Procesar la imagen del componente padre
@@ -171,10 +173,13 @@ class ComponentController extends Controller
             }
 
             $component = Component::findOrFail($id);
-            $baseStoragePath = public_path('storage/components/images/');
 
-            if (!file_exists($baseStoragePath)) {
-                mkdir($baseStoragePath, 0777, true);
+            if (config('filesystems.default') === 'local' || config('filesystems.default') === 'public') {
+                $baseStoragePath = public_path('storage/components/images/');
+
+                if (!file_exists($baseStoragePath)) {
+                    mkdir($baseStoragePath, 0777, true);
+                }
             }
 
             // Procesar imagen principal

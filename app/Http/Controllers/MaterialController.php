@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Helpers\ImageHelper;
 use App\Http\Responses\ApiResponse;
+use App\Services\FileStorageService;
 use Illuminate\Http\Request;
 use App\Models\Material;
 use App\Models\MaterialValue;
@@ -108,18 +109,10 @@ class MaterialController extends Controller
             // Crear el material principal
             $material = Material::create($request->only('id_material', 'name', 'status'));
 
-            // Definir la ruta base para guardar las imágenes
-            $baseStoragePath = public_path('storage/materials/images/');
-
-            // Verificar si la carpeta existe, si no, crearla
-            if (!file_exists($baseStoragePath)) {
-                mkdir($baseStoragePath, 0777, true);
-            }
-
             // Procesar los values si el material NO tiene submateriales
             if ($request->has_submaterials === "false" && $request->has('values')) {
                 foreach ($request->values as $valueData) {
-                    $valueData = $this->processMaterialValue($valueData, $baseStoragePath, $material->id);
+                    $valueData = $this->processMaterialValue($valueData, $material->id);
                     MaterialValue::create($valueData);
                 }
             }
@@ -137,7 +130,7 @@ class MaterialController extends Controller
                     // Procesar y guardar cada value asociado al submaterial
                     if (isset($submaterialData['values'])) {
                         foreach ($submaterialData['values'] as $subValueData) {
-                            $subValueData = $this->processMaterialValue($subValueData, $baseStoragePath, $submaterial->id);
+                            $subValueData = $this->processMaterialValue($subValueData, $submaterial->id);
                             MaterialValue::create($subValueData);
                         }
                     }
@@ -152,18 +145,15 @@ class MaterialController extends Controller
         }
     }
 
-    private function processMaterialValue($valueData, $baseStoragePath, $materialId)
+    private function processMaterialValue($valueData, $materialId)
     {
         // Procesar la imagen si existe
         if (isset($valueData['img']) && $valueData['img'] instanceof \Illuminate\Http\UploadedFile) {
-            $fileName = time() . '_' . $valueData['img']->getClientOriginalName();
-            $thumbnailPath = ImageHelper::saveReducedImage(
+            $valueData['img'] = FileStorageService::storeFile($valueData['img'], 'materials/images');
+            $valueData['thumbnail_img'] = ImageHelper::saveReducedImage(
                 $valueData['img'],
                 'storage/materials/images/'
             );
-            $valueData['img']->move($baseStoragePath, $fileName);
-            $valueData['img'] = 'storage/materials/images/' . $fileName;
-            $valueData['thumbnail_img'] = $thumbnailPath;
         }
 
         $valueData['id_material'] = $materialId;
@@ -201,29 +191,24 @@ class MaterialController extends Controller
             $material = Material::findOrFail($id);
             $material->update($request->only('id_material', 'name', 'status'));
 
-            $baseStoragePath = public_path('storage/materials/images/');
-            if (!file_exists($baseStoragePath)) {
-                mkdir($baseStoragePath, 0777, true);
-            }
-
             $receivedValueIds = $request->has('values') ? array_column($request->values, 'id') : [];
             $existingValues = $material->values()->pluck('id')->toArray();
             $valuesToDelete = array_diff($existingValues, $receivedValueIds);
 
             foreach ($valuesToDelete as $valueId) {
                 $valueToDelete = MaterialValue::findOrFail($valueId);
-                if ($valueToDelete->img) {
-                    $this->deleteFile($valueToDelete->img);
+                if ($valueToDelete->img && FileStorageService::fileExists($valueToDelete->img)) {
+                    FileStorageService::deleteFile($valueToDelete->img);
                 }
-                if ($valueToDelete->thumbnail_img) {
-                    $this->deleteFile($valueToDelete->thumbnail_img);
+                if ($valueToDelete->thumbnail_img && FileStorageService::fileExists($valueToDelete->thumbnail_img)) {
+                    FileStorageService::deleteFile($valueToDelete->thumbnail_img);
                 }
                 $valueToDelete->delete();
             }
 
             if ($request->has_submaterials === "false" && $request->has('values')) {
                 foreach ($request->values as $valueData) {
-                    $this->saveOrUpdateMaterialValue($valueData, $material, $baseStoragePath);
+                    $this->saveOrUpdateMaterialValue($valueData, $material);
                 }
             }
 
@@ -242,11 +227,11 @@ class MaterialController extends Controller
 
                     // Eliminar values asociados
                     foreach ($submaterialToDelete->values as $subValue) {
-                        if ($subValue->img) {
-                            $this->deleteFile($subValue->img);
+                        if ($subValue->img && FileStorageService::fileExists($subValue->img)) {
+                            FileStorageService::deleteFile($subValue->img);
                         }
-                        if ($subValue->thumbnail_img) {
-                            $this->deleteFile($subValue->thumbnail_img);
+                        if ($subValue->thumbnail_img && FileStorageService::fileExists($subValue->thumbnail_img)) {
+                            FileStorageService::deleteFile($subValue->thumbnail_img);
                         }
                         $subValue->delete();
                     }
@@ -269,18 +254,18 @@ class MaterialController extends Controller
 
                     foreach ($subValuesToDelete as $subValueId) {
                         $subValueToDelete = MaterialValue::findOrFail($subValueId);
-                        if ($subValueToDelete->img) {
-                            $this->deleteFile($subValueToDelete->img);
+                        if ($subValueToDelete->img && FileStorageService::fileExists($subValueToDelete->img)) {
+                            FileStorageService::deleteFile($subValueToDelete->img);
                         }
-                        if ($subValueToDelete->thumbnail_img) {
-                            $this->deleteFile($subValueToDelete->thumbnail_img);
+                        if ($subValueToDelete->thumbnail_img && FileStorageService::fileExists($subValueToDelete->thumbnail_img)) {
+                            FileStorageService::deleteFile($subValueToDelete->thumbnail_img);
                         }
                         $subValueToDelete->delete();
                     }
 
                     if (isset($submaterialData['values'])) {
                         foreach ($submaterialData['values'] as $subValueData) {
-                            $this->saveOrUpdateMaterialValue($subValueData, $submaterial, $baseStoragePath);
+                            $this->saveOrUpdateMaterialValue($subValueData, $submaterial);
                         }
                     }
                 }
@@ -298,9 +283,8 @@ class MaterialController extends Controller
      *
      * @param array $valueData
      * @param Material $material
-     * @param string $baseStoragePath
      */
-    private function saveOrUpdateMaterialValue(array $valueData, Material $material, string $baseStoragePath)
+    private function saveOrUpdateMaterialValue(array $valueData, Material $material)
     {
         // Si se proporciona un ID, se está actualizando un valor existente
         if (isset($valueData['id'])) {
@@ -309,22 +293,19 @@ class MaterialController extends Controller
             // Verificar si se proporcionó una nueva imagen
             if (array_key_exists('img', $valueData) && $valueData['img'] instanceof \Illuminate\Http\UploadedFile) {
                 // Eliminar la imagen anterior si existe
-                if ($value->img) {
-                    $this->deleteFile($value->img);
+                if ($value->img && FileStorageService::fileExists($value->img)) {
+                    FileStorageService::deleteFile($value->img);
                 }
-                if ($value->thumbnail_img) {
-                    $this->deleteFile($value->thumbnail_img);
+                if ($value->thumbnail_img && FileStorageService::fileExists($value->thumbnail_img)) {
+                    FileStorageService::deleteFile($value->thumbnail_img);
                 }
 
                 // Guardar la nueva imagen
-                $fileName = time() . '_' . $valueData['img']->getClientOriginalName();
-                $thumbnailPath = ImageHelper::saveReducedImage(
+                $valueData['img'] = FileStorageService::storeFile($valueData['img'], 'materials/images');
+                $valueData['thumbnail_img'] = ImageHelper::saveReducedImage(
                     $valueData['img'],
                     'storage/materials/images/'
                 );
-                $valueData['img']->move($baseStoragePath, $fileName);
-                $valueData['img'] = 'storage/materials/images/' . $fileName;
-                $valueData['thumbnail_img'] = $thumbnailPath;
             }
 
             // Actualizar el valor con la información proporcionada
@@ -332,20 +313,17 @@ class MaterialController extends Controller
         } else {
             // Si es un nuevo valor, procesar la imagen si se proporciona
             if (isset($valueData['img']) && $valueData['img'] instanceof \Illuminate\Http\UploadedFile) {
-                $fileName = time() . '_' . $valueData['img']->getClientOriginalName();
-                $thumbnailPath = ImageHelper::saveReducedImage(
+                $valueData['img'] = FileStorageService::storeFile($valueData['img'], 'materials/images');
+                $valueData['thumbnail_img'] = ImageHelper::saveReducedImage(
                     $valueData['img'],
                     'storage/materials/images/'
                 );
-                $valueData['img']->move($baseStoragePath, $fileName);
-                $valueData['img'] = 'storage/materials/images/' . $fileName;
-                $valueData['thumbnail_img'] = $thumbnailPath;
             }
 
             // Si no se proporciona imagen en la creación, establecer `img` como `null`
             $valueData['id_material'] = $material->id;
             $valueData['img'] = $valueData['img'] ?? null;
-            $valueData['thumbnail_img'] = $valueData['img'] ?? null;
+            $valueData['thumbnail_img'] = $valueData['thumbnail_img'] ?? null;
             MaterialValue::create($valueData);
         }
     }
@@ -359,7 +337,12 @@ class MaterialController extends Controller
             // Eliminar físicamente las imágenes asociadas a los values del material principal
             foreach ($material->values as $value) {
                 try {
-                    $this->deleteFile($value->img); // Eliminar imagen física
+                    if ($value->img && FileStorageService::fileExists($value->img)) {
+                        FileStorageService::deleteFile($value->img);
+                    }
+                    if ($value->thumbnail_img && FileStorageService::fileExists($value->thumbnail_img)) {
+                        FileStorageService::deleteFile($value->thumbnail_img);
+                    }
                     $value->delete(); // Marca el value como eliminado (soft delete)
                 } catch (Exception $e) {
                     Log::error("Error al eliminar el value del material con ID {$value->id}: " . $e->getMessage());
@@ -370,7 +353,12 @@ class MaterialController extends Controller
             foreach ($material->submaterials as $submaterial) {
                 foreach ($submaterial->values as $subValue) {
                     try {
-                        $this->deleteFile($subValue->img); // Eliminar imagen física
+                        if ($subValue->img && FileStorageService::fileExists($subValue->img)) {
+                            FileStorageService::deleteFile($subValue->img);
+                        }
+                        if ($subValue->thumbnail_img && FileStorageService::fileExists($subValue->thumbnail_img)) {
+                            FileStorageService::deleteFile($subValue->thumbnail_img);
+                        }
                         $subValue->delete(); // Marca el value del submaterial como eliminado (soft delete)
                     } catch (Exception $e) {
                         Log::error("Error al eliminar el value del submaterial con ID {$subValue->id}: " . $e->getMessage());
@@ -407,11 +395,11 @@ class MaterialController extends Controller
         // Verificar si es un archivo cargado
         if ($imageData instanceof \Illuminate\Http\UploadedFile) {
             // Si hay una imagen anterior, eliminarla
-            $this->deleteFile($oldPath);
+            if ($oldPath && FileStorageService::fileExists($oldPath)) {
+                FileStorageService::deleteFile($oldPath);
+            }
 
-            $fileName = time() . '_' . $imageData->getClientOriginalName();
-            $imageData->move($destination, $fileName);
-            return 'storage/materials/images/' . $fileName; // Ruta relativa para almacenar en la base de datos
+            return FileStorageService::storeFile($imageData, 'materials/images');
         }
 
         // Verificar si es un string (URL) o un valor no nulo
@@ -420,26 +408,13 @@ class MaterialController extends Controller
         }
 
         // Eliminar archivo si el valor es null y el archivo existía antes
-        if (is_null($imageData) && $oldPath) {
-            $this->deleteFile($oldPath);
+        if (is_null($imageData) && $oldPath && FileStorageService::fileExists($oldPath)) {
+            FileStorageService::deleteFile($oldPath);
             return null;
         }
 
         // Retornar la ruta antigua si no hubo cambios
         return $oldPath;
-    }
-
-
-    /**
-     * Eliminar un archivo de la ruta dada.
-     *
-     * @param string $filePath
-     */
-    private function deleteFile($filePath)
-    {
-        if (file_exists(public_path($filePath))) {
-            unlink(public_path($filePath));
-        }
     }
 
 

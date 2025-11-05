@@ -335,16 +335,18 @@ class CategoriesController extends Controller
      */
     private function createDirectories($basePath)
     {
-        if (!file_exists($basePath . 'images')) {
-            mkdir($basePath . 'images', 0777, true);
-        }
+        if (config('filesystems.default') === 'local' || config('filesystems.default') === 'public') {
+            if (!file_exists($basePath . 'images')) {
+                mkdir($basePath . 'images', 0777, true);
+            }
 
-        if (!file_exists($basePath . 'videos')) {
-            mkdir($basePath . 'videos', 0777, true);
-        }
+            if (!file_exists($basePath . 'videos')) {
+                mkdir($basePath . 'videos', 0777, true);
+            }
 
-        if (!file_exists($basePath . 'icons')) {
-            mkdir($basePath . 'icons', 0777, true);
+            if (!file_exists($basePath . 'icons')) {
+                mkdir($basePath . 'icons', 0777, true);
+            }
         }
     }
 
