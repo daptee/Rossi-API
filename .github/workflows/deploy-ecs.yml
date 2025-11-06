@@ -85,8 +85,14 @@ jobs:
           docker build -f "$DOCKERFILE_PHP"   -t "$PHP_ECR_URI:$IMAGE_TAG"   .
           docker build -f "$DOCKERFILE_NGINX" -t "$NGINX_ECR_URI:$IMAGE_TAG" .
 
+          # Also tag as latest
+          docker tag "$PHP_ECR_URI:$IMAGE_TAG" "$PHP_ECR_URI:latest"
+          docker tag "$NGINX_ECR_URI:$IMAGE_TAG" "$NGINX_ECR_URI:latest"
+
           docker push "$PHP_ECR_URI:$IMAGE_TAG"
           docker push "$NGINX_ECR_URI:$IMAGE_TAG"
+          docker push "$PHP_ECR_URI:latest"
+          docker push "$NGINX_ECR_URI:latest"
 
       - name: Read current Task Definition (base)
         id: getdef
