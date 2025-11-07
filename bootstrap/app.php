@@ -20,6 +20,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => AdminMiddleware::class,
             'cache.headers' => CacheHeadersMiddleware::class,
         ]);
+
+        // Apply cache headers middleware to API routes
+        $middleware->api(append: [
+            CacheHeadersMiddleware::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (AuthenticationException $e, Request $request) {
