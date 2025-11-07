@@ -1,0 +1,64 @@
+# compose.yml (recorte esencial)
+services:
+  php-fpm:
+    build:
+      context: .
+      dockerfile: Dockerfile        # tu Dockerfile (php:8.2-fpm-alpine)
+    container_name: php-fpm
+    expose:
+      - "9000"
+    volumes:
+          - ./:/var/www/html:z
+
+  web:
+    build:
+      context: .
+    # si tenés Dockerfile.nginx, especificarlo:
+      dockerfile: Dockerfile.nginx
+    environment:
+      USE_DOTENV: true
+    container_name: web
+    depends_on:
+      - php-fpm
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./:/var/www/html:z
+
+  mysql:
+    image: mysql:8.0
+    container_name: laravel-mysql
+    environment:
+      MYSQL_DATABASE: laravel
+      MYSQL_USER: laravel
+      MYSQL_PASSWORD: secret
+      MYSQL_ROOT_PASSWORD: rootsecret
+    ports:
+      - "3306:3306"
+    volumes:
+      - dbdata:/var/lib/mysql:z
+    command: >
+      --default-authentication-plugin=caching_sha2_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+
+  # Contenedor one-off para Composer (CLI). Trae PHP embebido, es compatible con 8.2 del runtime.
+  composer:
+    image: composer:2
+    container_name: laravel-composer
+    working_dir: /app
+    volumes:
+      - ./:/app:z
+    entrypoint: ["composer"]
+
+  # Contenedor one-off para Node/Vite (si lo usás)
+  node:
+    image: node:20
+    container_name: laravel-node
+    working_dir: /app
+    volumes:
+      - ./:/app:z
+    entrypoint: ["bash","-lc"]
+
+volumes:
+  dbdata:

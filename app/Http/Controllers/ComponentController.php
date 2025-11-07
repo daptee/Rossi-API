@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Helpers\ImageHelper;
+use App\Services\FileStorageService;
 use App\Models\Component;
 use App\Http\Responses\ApiResponse;
 use Illuminate\Http\Request;
@@ -81,24 +82,24 @@ class ComponentController extends Controller
                 return ApiResponse::create('Validation failed', 422, $validator->errors());
             }
 
-            // Definir la ruta base dentro de public/storage/components
-            $baseStoragePath = public_path('storage/components/images/');
+            if (config('filesystems.default') === 'local' || config('filesystems.default') === 'public') {
+                // Definir la ruta base dentro de public/storage/components
+                $baseStoragePath = public_path('storage/components/images/');
 
-            // Verificar si la carpeta existe, si no, crearla
-            if (!file_exists($baseStoragePath)) {
-                mkdir($baseStoragePath, 0777, true);
+                // Verificar si la carpeta existe, si no, crearla
+                if (!file_exists($baseStoragePath)) {
+                    mkdir($baseStoragePath, 0777, true);
+                }
             }
 
             // Procesar la imagen del componente padre
             $imgPath = null;
             if ($request->hasFile('img')) {
-                $fileName = time() . '_' . $request->file('img')->getClientOriginalName();
+                $imgPath = FileStorageService::storeFile($request->file('img'), 'storage/components/images');
                 $imgPathThumbnail = ImageHelper::saveReducedImage(
                     $request->file('img'),
                     'storage/components/images/'
                 );
-                $request->file('img')->move($baseStoragePath, $fileName);
-                $imgPath = 'storage/components/images/' . $fileName;
             }
 
             $decodedMetaData = json_decode($request->meta_data, true);
@@ -122,18 +123,12 @@ class ComponentController extends Controller
                     $subImgPathThumb = null;
                     if ($request->hasFile("subComponents.$index.img")) {
                         $imgFile = $request->file("subComponents.$index.img");
-            
-                        $fileName = time() . '_' . $imgFile->getClientOriginalName();
-            
-                        $subImgPathThumbnail = ImageHelper::saveReducedImage(
+
+                        $subImgPath = FileStorageService::storeFile($imgFile, 'storage/components/images');
+                        $subImgPathThumb = ImageHelper::saveReducedImage(
                             $imgFile,
                             'storage/components/images/'
                         );
-            
-                        $imgFile->move($baseStoragePath, $fileName);
-            
-                        $subImgPath = 'storage/components/images/' . $fileName;
-                        $subImgPathThumb = $subImgPathThumbnail;
                     }
 
                     $component->children()->create([
@@ -178,10 +173,13 @@ class ComponentController extends Controller
             }
 
             $component = Component::findOrFail($id);
-            $baseStoragePath = public_path('storage/components/images/');
 
-            if (!file_exists($baseStoragePath)) {
-                mkdir($baseStoragePath, 0777, true);
+            if (config('filesystems.default') === 'local' || config('filesystems.default') === 'public') {
+                $baseStoragePath = public_path('storage/components/images/');
+
+                if (!file_exists($baseStoragePath)) {
+                    mkdir($baseStoragePath, 0777, true);
+                }
             }
 
             // Procesar imagen principal
@@ -190,34 +188,29 @@ class ComponentController extends Controller
                     // Conservar imagen actual
                 } elseif (is_null($request->img)) {
                     // Eliminar imagen actual
-                    if ($component->img && file_exists(public_path($component->img))) {
-                        unlink(public_path($component->img));
+                    if ($component->img && FileStorageService::fileExists($component->img)) {
+                        FileStorageService::deleteFile($component->img);
                     }
-                    if ($component->thumbnail_img && file_exists(public_path($component->thumbnail_img))) {
-                        unlink(public_path($component->thumbnail_img));
+                    if ($component->thumbnail_img && FileStorageService::fileExists($component->thumbnail_img)) {
+                        FileStorageService::deleteFile($component->thumbnail_img);
                     }
                     $component->img = null;
                     $component->thumbnail_img = null;
                 } elseif ($request->hasFile('img')) {
                     // Reemplazar imagen actual
-                    if ($component->img && file_exists(public_path($component->img))) {
-                        unlink(public_path($component->img));
-                    }
-                    
-                    if ($component->thumbnail_img && file_exists(public_path($component->thumbnail_img))) {
-                        unlink(public_path($component->thumbnail_img));
+                    if ($component->img && FileStorageService::fileExists($component->img)) {
+                        FileStorageService::deleteFile($component->img);
                     }
 
-                    $fileName = time() . '_' . $request->file('img')->getClientOriginalName();
-                    Log::info('holaaaaaaaaaaaaaaaaaaaa'. $fileName);
-                    Log::info($request->file('img'));
-                    $imgPathThumbnail = ImageHelper::saveReducedImage(
+                    if ($component->thumbnail_img && FileStorageService::fileExists($component->thumbnail_img)) {
+                        FileStorageService::deleteFile($component->thumbnail_img);
+                    }
+
+                    $component->img = FileStorageService::storeFile($request->file('img'), 'storage/components/images');
+                    $component->thumbnail_img = ImageHelper::saveReducedImage(
                         $request->file('img'),
                         'storage/components/images/'
                     );
-                    $request->file('img')->move($baseStoragePath, $fileName);
-                    $component->img = 'storage/components/images/' . $fileName;
-                    $component->thumbnail_img = $imgPathThumbnail;
                 }
             }
 
@@ -241,11 +234,11 @@ class ComponentController extends Controller
                 // Eliminar subcomponentes no incluidos en la solicitud
                 $requestedIds = collect($request->subComponents)->pluck('id')->filter();
                 $component->children()->whereNotIn('id', $requestedIds)->get()->each(function ($subComponent) {
-                    if ($subComponent->img && file_exists(public_path($subComponent->img))) {
-                        unlink(public_path($subComponent->img));
+                    if ($subComponent->img && FileStorageService::fileExists($subComponent->img)) {
+                        FileStorageService::deleteFile($subComponent->img);
                     }
-                    if ($subComponent->thumbnail_img && file_exists(public_path($subComponent->thumbnail_img))) {
-                        unlink(public_path($subComponent->thumbnail_img));
+                    if ($subComponent->thumbnail_img && FileStorageService::fileExists($subComponent->thumbnail_img)) {
+                        FileStorageService::deleteFile($subComponent->thumbnail_img);
                     }
                     $subComponent->delete();
                 });
@@ -262,32 +255,29 @@ class ComponentController extends Controller
                             if ($request->hasFile("subComponents.{$index}.img")) {
                                 Log::info("aquiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii 2222");
                                 // Eliminar la imagen anterior si existe
-                                if ($subComponent->img && file_exists(public_path($subComponent->img))) {
-                                    unlink(public_path($subComponent->img));
+                                if ($subComponent->img && FileStorageService::fileExists($subComponent->img)) {
+                                    FileStorageService::deleteFile($subComponent->img);
                                 }
 
-                                if ($subComponent->thumbnail_img && file_exists(public_path($subComponent->thumbnail_img))) {
-                                    unlink(public_path($subComponent->thumbnail_img));
+                                if ($subComponent->thumbnail_img && FileStorageService::fileExists($subComponent->thumbnail_img)) {
+                                    FileStorageService::deleteFile($subComponent->thumbnail_img);
                                 }
 
                                 // Procesar nueva imagen
-                                $fileName = time() . '_subcomponent_' . $request->file("subComponents.{$index}.img")->getClientOriginalName();
-                                $subImgPathThumbnail = ImageHelper::saveReducedImage(
+                                $subComponent->img = FileStorageService::storeFile($request->file("subComponents.{$index}.img"), 'storage/components/images');
+                                $subComponent->thumbnail_img = ImageHelper::saveReducedImage(
                                     $request->file("subComponents.{$index}.img"),
                                     'storage/components/images/'
                                 );
-                                $request->file("subComponents.{$index}.img")->move($baseStoragePath, $fileName);
-                                $subComponent->img = 'storage/components/images/' . $fileName;
-                                $subComponent->thumbnail_img = $subImgPathThumbnail;
                             } elseif ($request->input("subComponents.{$index}.img") === null) {
                                 Log::info("Se recibió `null`, la imagen será eliminada.");
 
                                 // Caso en el que se envíe `null` para eliminar la imagen
-                                if ($subComponent->img && file_exists(public_path($subComponent->img))) {
-                                    unlink(public_path($subComponent->img));
+                                if ($subComponent->img && FileStorageService::fileExists($subComponent->img)) {
+                                    FileStorageService::deleteFile($subComponent->img);
                                 }
-                                if ($subComponent->thumbnail_img && file_exists(public_path($subComponent->thumbnail_img))) {
-                                    unlink(public_path($subComponent->thumbnail_img));
+                                if ($subComponent->thumbnail_img && FileStorageService::fileExists($subComponent->thumbnail_img)) {
+                                    FileStorageService::deleteFile($subComponent->thumbnail_img);
                                 }
                                 $subComponent->img = null;
                                 $subComponent->thumbnail_img = null;
@@ -311,18 +301,15 @@ class ComponentController extends Controller
                         // Crear nuevos subcomponentes
                         $newImgPath = null;
                         $newImgPathThumb = null;
-    
+
                         if ($request->hasFile("subComponents.{$index}.img")) {
-                            $fileName = time() . '_subcomponent_' . $request->file("subComponents.{$index}.img")->getClientOriginalName();
-                            $newSubImgPathThumbnail = ImageHelper::saveReducedImage(
+                            $newImgPath = FileStorageService::storeFile($request->file("subComponents.{$index}.img"), 'storage/components/images');
+                            $newImgPathThumb = ImageHelper::saveReducedImage(
                                 $request->file("subComponents.{$index}.img"),
                                 'storage/components/images/'
                             );
-                            $request->file("subComponents.{$index}.img")->move($baseStoragePath, $fileName);
-                            $newImgPath = 'storage/components/images/' . $fileName;
-                            $newImgPathThumb = $newSubImgPathThumbnail;
                         }
-    
+
                         $component->children()->create([
                             'name' => $subComponentData['name'],
                             'description' => $subComponentData['description'] ?? '',

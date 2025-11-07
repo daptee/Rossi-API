@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Helpers\ImageHelper;
+use App\Services\FileStorageService;
 use App\Models\GalleryWebContentAbout;
 use App\Models\WebContentAbout;
 use App\Http\Responses\ApiResponse;
@@ -52,23 +53,8 @@ class WebContentAboutController extends Controller
                 if ($request->hasFile($inputName)) {
                     $uploadedVideo = $request->file($inputName);
 
-                    // Generar un nombre único para el video
-                    $uniqueFileName = uniqid() . '_' . time() . '.' . $uploadedVideo->getClientOriginalExtension();
-
-                    // Definir la ruta de almacenamiento
-                    $directory = public_path('storage/web_content_about');
-                    $path = $directory . '/' . $uniqueFileName;
-
-                    // Crear el directorio si no existe
-                    if (!file_exists($directory)) {
-                        mkdir($directory, 0755, true);
-                    }
-
-                    // Mover el video al almacenamiento
-                    $uploadedVideo->move($directory, $uniqueFileName);
-
-                    // Guardar la ruta del video
-                    $videoPaths[$dbColumn] = "storage/web_content_about/" . $uniqueFileName;
+                    // Guardar la ruta del video usando FileStorageService
+                    $videoPaths[$dbColumn] = FileStorageService::storeFile($uploadedVideo, 'storage/web_content_about');
                 }
             }
 
@@ -86,31 +72,18 @@ class WebContentAboutController extends Controller
                     if (isset($galleryItem['file']) && $galleryItem['file']->isValid()) {
                         $uploadedFile = $galleryItem['file'];
 
-                        // Generar un nombre único para la imagen
-                        $uniqueFileName = uniqid() . '_' . time() . '.' . $uploadedFile->getClientOriginalExtension();
+                        // Guardar la imagen usando FileStorageService
+                        $filePath = FileStorageService::storeFile($uploadedFile, 'storage/web_content_about/gallery');
 
-                        // Definir la ruta de almacenamiento
-                        $galleryDirectory = public_path('storage/web_content_about/gallery');
-                        $galleryPath = $galleryDirectory . '/' . $uniqueFileName;
-
-                        // Crear el directorio si no existe
-                        if (!file_exists($galleryDirectory)) {
-                            mkdir($galleryDirectory, 0755, true);
-                        };
-
-                        
                         $newFileThumbnailPath = ImageHelper::saveReducedImage(
                             $galleryItem['file'],
                             "storage/web_content_about/gallery/",
                         );
 
-                        // Mover la imagen al almacenamiento
-                        $uploadedFile->move($galleryDirectory, $uniqueFileName);
-
                         // Guardar el registro en la tabla de galería
                         $gallery = GalleryWebContentAbout::create([
                             'id_web_content_about' => $webContent->id,
-                            'file' => "storage/web_content_about/gallery/" . $uniqueFileName,
+                            'file' => $filePath,
                             'thumbnail_file' => $newFileThumbnailPath,
                         ]);
 
@@ -166,19 +139,12 @@ class WebContentAboutController extends Controller
                     $uploadedVideo = $request->file($inputName);
 
                     // Eliminar el video anterior si existe
-                    if ($webContent->$dbColumn) {
-                        $oldVideoPath = public_path($webContent->$dbColumn);
-                        if (file_exists($oldVideoPath)) {
-                            unlink($oldVideoPath);
-                        }
+                    if ($webContent->$dbColumn && FileStorageService::fileExists($webContent->$dbColumn)) {
+                        FileStorageService::deleteFile($webContent->$dbColumn);
                     }
 
-                    // Subir el nuevo video
-                    $uniqueFileName = uniqid() . '_' . time() . '.' . $uploadedVideo->getClientOriginalExtension();
-                    $directory = public_path('storage/web_content_about');
-                    $uploadedVideo->move($directory, $uniqueFileName);
-
-                    $videoPaths[$dbColumn] = "storage/web_content_about/" . $uniqueFileName;
+                    // Subir el nuevo video usando FileStorageService
+                    $videoPaths[$dbColumn] = FileStorageService::storeFile($uploadedVideo, 'storage/web_content_about');
                 }
             }
 
@@ -196,31 +162,25 @@ class WebContentAboutController extends Controller
                     if (isset($galleryItem['id']) && isset($galleryItem['file']) && $galleryItem['file']->isValid()) {
                         $existingImage = GalleryWebContentAbout::find($galleryItem['id']);
                         if ($existingImage) {
-                            // Eliminar la imagen anterior del servidor
-                            $oldImagePath = public_path($existingImage->file);
-                            $oldThumbnailImagePath = public_path($existingImage->thumbnail_file);
-                            if (file_exists($oldImagePath)) {
-                                unlink($oldImagePath);
+                            // Eliminar la imagen anterior del servidor usando FileStorageService
+                            if ($existingImage->file && FileStorageService::fileExists($existingImage->file)) {
+                                FileStorageService::deleteFile($existingImage->file);
                             }
 
-                            if (file_exists($oldThumbnailImagePath) && $existingImage->thumbnail_file != null) {
-                                unlink($oldThumbnailImagePath);
+                            if ($existingImage->thumbnail_file && FileStorageService::fileExists($existingImage->thumbnail_file)) {
+                                FileStorageService::deleteFile($existingImage->thumbnail_file);
                             }
 
-                            // Subir la nueva imagen
+                            // Subir la nueva imagen usando FileStorageService
                             $uploadedFile = $galleryItem['file'];
+                            $newFilePath = FileStorageService::storeFile($uploadedFile, 'storage/web_content_about/gallery');
 
                             $thumbnailFilePath = ImageHelper::saveReducedImage(
                                 $galleryItem['file'],
                                 "storage/web_content_about/gallery/",
                             );
 
-                            $uniqueFileName = uniqid() . '_' . time() . '.' . $uploadedFile->getClientOriginalExtension();
-                            $galleryDirectory = public_path('storage/web_content_about/gallery');
-                            $uploadedFile->move($galleryDirectory, $uniqueFileName);
-
                             // Actualizar la base de datos
-                            $newFilePath = "storage/web_content_about/gallery/" . $uniqueFileName;
                             $existingImage->update(
                                 [
                                     'file' => $newFilePath,
@@ -251,16 +211,13 @@ class WebContentAboutController extends Controller
                         Log::info("holaaaaa");
                         $uploadedFile = $galleryItem['file'];
 
+                        // Subir la nueva imagen usando FileStorageService
+                        $newFilePath = FileStorageService::storeFile($uploadedFile, 'storage/web_content_about/gallery');
+
                         $newThumbnailFilePath = ImageHelper::saveReducedImage(
                             $galleryItem['file'],
                             "storage/web_content_about/gallery/",
                         );
-
-                        $uniqueFileName = uniqid() . '_' . time() . '.' . $uploadedFile->getClientOriginalExtension();
-                        $galleryDirectory = public_path('storage/web_content_about/gallery');
-                        $uploadedFile->move($galleryDirectory, $uniqueFileName);
-
-                        $newFilePath = "storage/web_content_about/gallery/" . $uniqueFileName;
 
                         // Guardar la imagen en la base de datos
                         $newGalleryImage = GalleryWebContentAbout::create([
