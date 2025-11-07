@@ -8,7 +8,7 @@ services:
     expose:
       - "9000"
     volumes:
-          - ./:/var/www/html:z
+      - ./:/var/www/html:z
 
   web:
     build:
@@ -50,15 +50,5 @@ services:
     volumes:
       - ./:/app:z
     entrypoint: ["composer"]
-
-  # Contenedor one-off para Node/Vite (si lo usás)
-  node:
-    image: node:20
-    container_name: laravel-node
-    working_dir: /app
-    volumes:
-      - ./:/app:z
-    entrypoint: ["bash","-lc"]
-
 volumes:
   dbdata:
