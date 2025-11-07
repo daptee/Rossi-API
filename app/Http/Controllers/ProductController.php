@@ -4,10 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Helpers\ImageHelper;
 use App\Http\Responses\ApiResponse;
-use App\Models\ProductAttributeValue;
+use App\Models\Product3DModel;
 use App\Models\ProductComponent;
-use App\Models\ProductMaterialValue;
-use App\Models\ProductParentAttribute;
+use App\Services\FileStorageService;
+use Barryvdh\DomPDF\Facade\Pdf;
+use App\Models\ProductsRelated;
 use App\Models\ProductStatus;
 use Illuminate\Http\Request;
 use App\Models\Product;
@@ -33,8 +34,8 @@ class ProductController extends Controller
             // Consulta inicial
             $query = Product::select('products.id', 'products.name', 'products.main_img', 'products.thumbnail_main_img', 'products.sub_img', 'products.thumbnail_main_img', 'products.status', 'products.featured', 'product_status.status_name', 'products.sku', 'products.slug', 'products.meta_data', 'products.created_at')
                 ->join('product_status', 'products.status', '=', 'product_status.id')
-                ->with(['categories.parent', 'materials', 'attributes', 'gallery', 'components'])
-                ->withCount(['categories', 'materials', 'attributes', 'gallery', 'components']);
+                ->with(['categories.parent', 'materials', 'attributes', 'gallery', 'components', 'relatedProducts'])
+                ->withCount(['categories', 'materials', 'attributes', 'gallery', 'components', 'relatedProducts']);
 
             if ($category_id) {
                 $query->whereHas('categories', function ($query) use ($category_id) {
@@ -94,6 +95,15 @@ class ProductController extends Controller
                     'components_count' => $product->components_count,
                     'gallery_count' => $product->gallery_count,
                     'meta_data' => $product->meta_data,
+                    'related_products' => $product->relatedProducts->map(function ($related) {
+                        return [
+                            'id' => $related->related->id,
+                            'name' => $related->related->name,
+                            'sku' => $related->related->sku,
+                            'main_img' => $related->related->main_img,
+                            'thumbnail_main_img' => $related->related->thumbnail_main_img,
+                        ];
+                    }),
                     'created_date' => $product->created_at,
                 ];
             });
@@ -136,7 +146,8 @@ class ProductController extends Controller
                 'materials.material',
                 'attributes.attribute',
                 'gallery',
-                'components'
+                'components',
+                'relatedProducts.related'
             ])
                 ->select(
                     'id',
@@ -248,9 +259,11 @@ class ProductController extends Controller
                 'materials.material',
                 'attributes.attribute',
                 'gallery',
-                'components'
+                'components',
+                'product3DModels',
+                'relatedProducts.related'
             ])
-                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'thumbnail_main_img', 'sub_img', 'thumbnail_sub_img', 'main_video', 'file_data_sheet', 'status', 'featured', 'meta_data')
+                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'thumbnail_main_img', 'sub_img', 'thumbnail_sub_img', 'customizable', 'main_video', 'file_data_sheet', 'status', 'featured', 'meta_data')
                 ->findOrFail($id);
 
             // Limpia los datos del pivot para cada relación
@@ -259,14 +272,12 @@ class ProductController extends Controller
             });
 
             $product->materials->each(function ($material) {
-                $material->id_product_material_value = $material->pivot->id;
                 $material->img_value = $material->pivot->img;
                 $material->thumbnail_img_value = $material->pivot->thumbnail_img;
                 unset($material->pivot);
             });
 
             $product->attributes->each(function ($attribute) {
-                $attribute->id_product_atribute_value = $attribute->pivot->id;
                 $attribute->img = $attribute->pivot->img;
                 $attribute->thumbnail_img = $attribute->pivot->thumbnail_img;
                 unset($attribute->pivot);
@@ -278,32 +289,7 @@ class ProductController extends Controller
 
             // Reorganiza los parent_attributes3d por id_attribute para fácil acceso
             $attributes3D = [];
-            foreach ($product->parentAttributes3d as $attr3D) {
-                $attributes3D[$attr3D->id_attribute] = $attr3D->file_3d ?? $attr3D->{"3d_file"};
-            }
 
-            // Inserta 3d_file dentro del atributo correspondiente
-            $product->attributes->each(function ($attribute) use ($attributes3D) {
-                if (isset($attributes3D[$attribute->id_attribute])) {
-                    $attribute->attribute->file_3d = $attributes3D[$attribute->id_attribute];
-                } else {
-                    $attribute->attribute->file_3d = null;
-                }
-            });
-
-            $attributeFilesGrouped = $product->attributeFiles->groupBy('id_product_atribute_value');
-
-            // Añadir el array 'file' a cada attribute
-            $product->attributes->each(function ($attribute) use ($attributeFilesGrouped) {
-                $attribute->files = $attributeFilesGrouped->get($attribute->id_product_atribute_value, collect())->values();
-            });
-
-            $materialFilesGrouped = $product->materialFiles->groupBy('id_product_material_value');
-
-            // Añadir el array 'file' a cada material
-            $product->materials->each(function ($material) use ($materialFilesGrouped) {
-                $material->files = $materialFilesGrouped->get($material->id_product_material_value, collect())->values();
-            });
 
 
             // Obtener el nombre del estado del producto desde la tabla product_status
@@ -337,7 +323,6 @@ class ProductController extends Controller
     public function skuProduct($sku)
     {
         try {
-            Log::info($sku);
 
             // Consulta el producto con todas las relaciones necesarias
             $product = Product::with([
@@ -345,11 +330,17 @@ class ProductController extends Controller
                 'materials.material',
                 'attributes.attribute',
                 'gallery',
-                'components'
+                'components',
+                'product3DModels',
+                'relatedProducts.related'
             ])
-                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'thumbnail_main_img', 'sub_img', 'thumbnail_sub_img', 'main_video', 'file_data_sheet', 'status', 'featured', 'meta_data')
+                ->select('id', 'name', 'slug', 'sku', 'description', 'description_bold', 'description_italic', 'description_underline', 'main_img', 'thumbnail_main_img', 'sub_img', 'thumbnail_sub_img', 'main_video', 'file_data_sheet', 'customizable', 'status', 'featured', 'meta_data')
                 ->where('sku', $sku)
-                ->firstOrFail();
+                ->first();
+
+            if (!$product) {
+                return ApiResponse::create('Producto no encontrado', 404);
+            }
 
             // Limpia los datos del pivot para cada relación
             $product->categories->each(function ($category) {
@@ -485,8 +476,6 @@ class ProductController extends Controller
                 'status' => 'required|integer|exists:product_status,id',
                 'main_img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
                 'sub_img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
-                'customizable' => 'nullable|boolean',
-                '3d_file' => 'nullable|file|mimes:glb,gltf,zip|max:50480',
                 'main_video' => 'nullable|file|mimes:mp4,mov,avi|max:10240',
                 'file_data_sheet' => 'nullable|file|mimes:pdf|max:5120',
                 'featured' => 'nullable|boolean',
@@ -501,72 +490,75 @@ class ProductController extends Controller
                 'attributes_values' => 'array',
                 'attributes_values.*.id_attribute_value' => 'required|integer|exists:attribute_values,id',
                 'attributes_values.*.img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
-                'attribute_3d' => 'array',
-                'attribute_3d.*.id_attribute' => 'required|integer|exists:attributes,id',
-                'attribute_3d.*.file' => 'nullable|file|mimes:glb,gltf,zip|max:50480',
-                'product_attribute_value' => 'array',
-                'product_attribute_value.*.id_attribute_value' => 'required|integer|exists:attribute_values,id',
-                'product_attribute_value.*.img' => 'required|file|mimes:jpg,jpeg,png,webp',
-                'product_material_value' => 'array',
-                'product_material_value.*.id_material_value' => 'required|integer|exists:material_values,id',
-                'product_material_value.*.img' => 'required|file|mimes:jpg,jpeg,png,webp',
+                'customizable' => 'required|boolean',
+                '3d_files' => 'array',
+                '3d_files.*.name_file' => 'required|string|max:100',
+                '3d_files.*.glb_file' => 'required|file',
+                '3d_files.*.data' => 'required|json',
                 'components' => 'array',
                 'components.*' => 'integer|exists:components,id',
+                'products_related' => 'nullable|array',
+                'products_related.*' => 'integer|exists:products,id',
             ]);
 
             if ($validator->fails()) {
                 return ApiResponse::create('Validation failed', 422, $validator->errors());
             }
 
-            // Rutas base en la carpeta public
-            $baseStoragePath = public_path('storage/products');
+            if (config('filesystems.default') === 'local' || config('filesystems.default') === 'public') {
 
-            // Asegurar que la carpeta base existe
-            if (!file_exists($baseStoragePath)) {
-                mkdir($baseStoragePath, 0755, true);
+                // Rutas base en la carpeta public
+                $baseStoragePath = public_path('storage/products');
+
+                // Asegurar que la carpeta base existe
+                if (!file_exists($baseStoragePath)) {
+                    mkdir($baseStoragePath, 0755, true);
+                }
+
+                // Luego puedes crear subcarpetas sin error
+                if (!file_exists("$baseStoragePath/images")) {
+                    mkdir("$baseStoragePath/images", 0755, true);
+                }
+
+                // Crear directorios si no existen
+                if (!file_exists("$baseStoragePath/images"))
+                    mkdir("$baseStoragePath/images", 0755, true);
+                if (!file_exists("$baseStoragePath/videos"))
+                    mkdir("$baseStoragePath/videos", 0755, true);
+                if (!file_exists("$baseStoragePath/data_sheets"))
+                    mkdir("$baseStoragePath/data_sheets", 0755, true);
+                if (!file_exists("$baseStoragePath/gallery"))
+                    mkdir("$baseStoragePath/gallery", 0755, true);
+                if (!file_exists("$baseStoragePath/materials"))
+                    mkdir("$baseStoragePath/materials", 0755, true);
+                if (!file_exists("$baseStoragePath/attributes"))
+                    mkdir("$baseStoragePath/attributes", 0755, true);
+                if (!file_exists("$baseStoragePath/3d/attributes"))
+                    mkdir("$baseStoragePath/3d/attributes", 0755, true);
             }
-
-            // Luego puedes crear subcarpetas sin error
-            if (!file_exists("$baseStoragePath/images")) {
-                mkdir("$baseStoragePath/images", 0755, true);
-            }
-
-            // Crear directorios si no existen
-            if (!file_exists("$baseStoragePath/images"))
-                mkdir("$baseStoragePath/images", 0755, true);
-            if (!file_exists("$baseStoragePath/videos"))
-                mkdir("$baseStoragePath/videos", 0755, true);
-            if (!file_exists("$baseStoragePath/data_sheets"))
-                mkdir("$baseStoragePath/data_sheets", 0755, true);
-            if (!file_exists("$baseStoragePath/gallery"))
-                mkdir("$baseStoragePath/gallery", 0755, true);
-            if (!file_exists("$baseStoragePath/materials"))
-                mkdir("$baseStoragePath/materials", 0755, true);
-            if (!file_exists("$baseStoragePath/attributes"))
-                mkdir("$baseStoragePath/attributes", 0755, true);
-            if (!file_exists("$baseStoragePath/3d/attributes"))
-                mkdir("$baseStoragePath/3d/attributes", 0755, true);
-
-            // Almacenar archivos principales en la carpeta 'public/storage/products'
+            // Store files using FileStorageService
+            $mainImgPath = null;
             $mainImgThumbnailPath = null;
             if ($request->hasFile('main_img')) {
+                $mainImgPath = FileStorageService::storeFile($request->file('main_img'), 'storage/products/images');
                 $mainImgThumbnailPath = ImageHelper::saveReducedImage(
                     $request->file('main_img'),
                     'storage/products/images/',
                 );
             }
-            $mainImgPath = $request->hasFile('main_img') ? $request->file('main_img')->move("$baseStoragePath/images", uniqid() . '_' . $request->file('main_img')->getClientOriginalName()) : null;
 
+            $subImgPath = null;
             $subImgThumbnailPath = null;
             if ($request->hasFile('sub_img')) {
+                $subImgPath = FileStorageService::storeFile($request->file('sub_img'), 'storage/products/images');
                 $subImgThumbnailPath = ImageHelper::saveReducedImage(
                     $request->file('sub_img'),
                     "storage/products/images/",
                 );
             }
-            $subImgPath = $request->hasFile('sub_img') ? $request->file('sub_img')->move("$baseStoragePath/images", uniqid() . '_' . $request->file('sub_img')->getClientOriginalName()) : null;
-            $mainVideoPath = $request->hasFile('main_video') ? $request->file('main_video')->move("$baseStoragePath/videos", uniqid() . '_' . $request->file('main_video')->getClientOriginalName()) : null;
-            $fileDataSheetPath = $request->hasFile('file_data_sheet') ? $request->file('file_data_sheet')->move("$baseStoragePath/data_sheets", uniqid() . '_' . $request->file('file_data_sheet')->getClientOriginalName()) : null;
+
+            $mainVideoPath = $request->hasFile('main_video') ? FileStorageService::storeFile($request->file('main_video'), 'storage/products/videos') : null;
+            $fileDataSheetPath = $request->hasFile('file_data_sheet') ? FileStorageService::storeFile($request->file('file_data_sheet'), 'storage/products/data_sheets') : null;
 
             $decodedMetaData = json_decode($request->meta_data, true);
 
@@ -579,14 +571,14 @@ class ProductController extends Controller
                 'description_italic' => $request->description_italic,
                 'description_underline' => $request->description_underline,
                 'status' => $request->status,
-                'main_img' => $mainImgPath ? "storage/products/images/" . basename($mainImgPath) : null,
-                'thumbnail_main_img' => $mainImgThumbnailPath ? $mainImgThumbnailPath : null,
-                'sub_img' => $subImgPath ? "storage/products/images/" . basename($subImgPath) : null,
-                'thumbnail_sub_img' => $subImgThumbnailPath ? $subImgThumbnailPath : null,
+                'main_img' => $mainImgPath,
+                'thumbnail_main_img' => $mainImgThumbnailPath,
+                'sub_img' => $subImgPath,
+                'thumbnail_sub_img' => $subImgThumbnailPath,
                 'customizable' => $request->customizable,
                 '3d_file' => null,
-                'main_video' => $mainVideoPath ? "storage/products/videos/" . basename($mainVideoPath) : null,
-                'file_data_sheet' => $fileDataSheetPath ? "storage/products/data_sheets/" . basename($fileDataSheetPath) : null,
+                'main_video' => $mainVideoPath,
+                'file_data_sheet' => $fileDataSheetPath,
                 'featured' => $request->featured,
                 'meta_data' => $decodedMetaData,
             ]);
@@ -595,44 +587,18 @@ class ProductController extends Controller
             // Guardar archivos en la galería
             if ($request->has('gallery')) {
                 foreach ($request->gallery as $file) {
-                    $uniqueName = uniqid() . '_' . $file->getClientOriginalName();
+                    $filePath = FileStorageService::storeFile($file, 'storage/products/gallery');
                     $fileThumbnailPath = ImageHelper::saveReducedImage(
                         $file,
                         "storage/products/gallery/",
                     );
-                    $filePath = $file->move("$baseStoragePath/gallery", $uniqueName);
                     ProductGallery::create(
                         [
                             'id_product' => $product->id,
-                            'file' => "storage/products/gallery/" . $uniqueName,
+                            'file' => $filePath,
                             'thumbnail_file' => $fileThumbnailPath,
                         ]
                     );
-                }
-            }
-
-            $base3DFilePath = null;
-            if ($request->hasFile('3d_file') && $request->customizable == 1) {
-                $uniqueName = uniqid() . '_' . $request->file('3d_file')->getClientOriginalName();
-                $base3DFilePath = $request->file('3d_file')->move("$baseStoragePath/3d", $uniqueName);
-                $product->update([
-                    '3d_file' => "storage/products/3d/" . basename($base3DFilePath),
-                ]);
-            }
-
-            if ($request->has('attribute_3d')) {
-                foreach ($request->attribute_3d as $index => $attribute3D) {
-                    if (isset($attribute3D['file']) && $request->hasFile("attribute_3d.$index.file")) {
-                        $file = $request->file("attribute_3d.$index.file");
-                        $uniqueName = uniqid() . '_' . $file->getClientOriginalName();
-                        $storedPath = $file->move("$baseStoragePath/3d/attributes", $uniqueName);
-
-                        ProductParentAttribute::create([
-                            'id_product' => $product->id,
-                            'id_attribute' => $attribute3D['id_attribute'],
-                            '3d_file' => "storage/products/3d/attributes/" . basename($storedPath),
-                        ]);
-                    }
                 }
             }
 
@@ -656,38 +622,17 @@ class ProductController extends Controller
                     }
                     ;
                     $materialImgPath = isset($material['img']) && $request->hasFile("materials_values.$index.img")
-                        ? $request->file("materials_values.$index.img")->move("$baseStoragePath/materials", uniqid() . '_' . $request->file("materials_values.$index.img")->getClientOriginalName())
+                        ? FileStorageService::storeFile($request->file("materials_values.$index.img"), 'storage/products/materials')
                         : null;
 
                     $productMaterial = ProductMaterial::create([
                         'id_product' => $product->id,
                         'id_material' => $material['id_material_value'],
-                        'img' => $materialImgPath ? "storage/products/materials/" . basename($materialImgPath) : null,
+                        'img' => $materialImgPath,
                         'thumbnail_img' => $materialImgThumbnailPath ? $materialImgThumbnailPath : null,
                     ]);
 
                     $productMaterialMap[$material['id_material_value']] = $productMaterial->id;
-                }
-            }
-
-            if ($request->has('product_material_value')) {
-                foreach ($request->product_material_value as $index => $materialValue) {
-                    if ($request->hasFile("product_material_value.$index.img")) {
-                        $file = $request->file("product_material_value.$index.img");
-                        $materialValueImgThumbnailPath = ImageHelper::saveReducedImage(
-                            $request->file("product_material_value.$index.img"),
-                            "storage/products/materials/",
-                        );
-                        $uniqueName = uniqid() . '_' . $file->getClientOriginalName();
-                        $storedPath = $file->move(public_path('storage/products/materials'), $uniqueName);
-
-                        ProductMaterialValue::create([
-                            'id_product_material_value' => $productMaterialMap[$materialValue['id_material_value']],
-                            'id_product' => $product->id,
-                            'img' => 'storage/products/materials/' . basename($storedPath),
-                            'thumbnail_img' => $materialValueImgThumbnailPath ? $materialValueImgThumbnailPath : null,
-                        ]);
-                    }
                 }
             }
 
@@ -704,13 +649,13 @@ class ProductController extends Controller
                     }
                     ;
                     $attributeImgPath = isset($attribute['img']) && $request->hasFile("attributes_values.$index.img")
-                        ? $request->file("attributes_values.$index.img")->move("$baseStoragePath/attributes", uniqid() . '_' . $request->file("attributes_values.$index.img")->getClientOriginalName())
+                        ? FileStorageService::storeFile($request->file("attributes_values.$index.img"), 'storage/products/attributes')
                         : null;
 
                     $productAttribute = ProductAttribute::create([
                         'id_product' => $product->id,
                         'id_attribute_value' => $attribute['id_attribute_value'],
-                        'img' => $attributeImgPath ? "storage/products/attributes/" . basename($attributeImgPath) : null,
+                        'img' => $attributeImgPath,
                         'thumbnail_img' => $attributeImgThumbnailPath ? $attributeImgThumbnailPath : null,
                     ]);
 
@@ -718,24 +663,88 @@ class ProductController extends Controller
                 }
             }
 
-            if ($request->has('product_attribute_value')) {
-                foreach ($request->product_attribute_value as $index => $attributeValue) {
-                    if ($request->hasFile("product_attribute_value.$index.img")) {
-                        $file = $request->file("product_attribute_value.$index.img");
-                        $attributeValueImgThumbnailPath = ImageHelper::saveReducedImage(
-                            $request->file("product_attribute_value.$index.img"),
-                            "storage/products/attributes/",
-                        );
-                        $uniqueName = uniqid() . '_' . $file->getClientOriginalName();
-                        $storedPath = $file->move(public_path('storage/products/attributes'), $uniqueName);
+            // verificar si es customizable, si es 1 o true, entonces guardar los modelos 3D
 
-                        ProductAttributeValue::create([
-                            'id_product_atribute_value' => $productAttributeMap[$attributeValue['id_attribute_value']],
-                            'id_product' => $product->id,
-                            'img' => 'storage/products/attributes/' . basename($storedPath),
-                            'thumbnail_img' => $attributeValueImgThumbnailPath ? $attributeValueImgThumbnailPath : null,
-                        ]);
+
+            if ($request->has('3d_files') && is_array($request->input('3d_files')) && $request->has('customizable') && $request->customizable) {
+                foreach ($request->input('3d_files') as $index => $fileData) {
+                    // Obtener archivo glb y estructura
+                    $glbFile = $request->file("3d_files.$index.glb_file");
+                    $structureJson = $fileData['data'];
+                    $structure = json_decode($structureJson, true);
+
+                    // Guardar archivo .glb
+                    $glbPath = FileStorageService::storeFile($glbFile, 'storage/products/3d');
+
+                    // Obtener todos los archivos cargados
+                    $allFiles = $request->file('3d_files');
+
+                    // Procesar atributos
+                    if (isset($structure['attributes'])) {
+                        foreach ($structure['attributes'] as &$attribute) {
+                            foreach ($attribute['values'] as &$value) {
+                                Log::info('Processing attribute value', ['attribute' => $attribute, 'value' => $value]);
+
+                                $imageKey = "attribute_{$attribute['id']}_value_{$value['id']}";
+                                $images = $allFiles[$index]['images'][$imageKey] ?? null;
+
+                                Log::info('Image key:', ['key' => $imageKey]);
+                                Log::info('Images:', ['images' => $images]);
+
+                                $paths = [];
+
+                                if (is_array($images)) {
+                                    foreach ($images as $image) {
+                                        $paths[] = FileStorageService::storeFile($image, 'storage/products/3d/attributes');
+                                    }
+                                } elseif ($images instanceof \Illuminate\Http\UploadedFile) {
+                                    $paths[] = FileStorageService::storeFile($images, 'storage/products/3d/attributes');
+                                }
+
+                                Log::info('Paths:', ['paths' => $paths]);
+
+                                $value['images'] = $paths;
+
+                                Log::info('Updated value with images', ['value' => $value]);
+                            }
+                        }
                     }
+
+                    // Procesar materiales
+                    if (isset($structure['materials'])) {
+                        foreach ($structure['materials'] as &$material) {
+                            foreach ($material['values'] as &$value) {
+                                $imageKey = "material_{$material['id']}_value_{$value['id']}";
+                                $images = $allFiles[$index]['images'][$imageKey] ?? null;
+
+                                Log::info('Material image key:', ['key' => $imageKey]);
+                                Log::info('Material images:', ['images' => $images]);
+
+                                $paths = [];
+
+                                if (is_array($images)) {
+                                    foreach ($images as $image) {
+                                        $paths[] = FileStorageService::storeFile($image, 'storage/products/3d/materials');
+                                    }
+                                } elseif ($images instanceof \Illuminate\Http\UploadedFile) {
+                                    $paths[] = FileStorageService::storeFile($images, 'storage/products/3d/materials');
+                                }
+
+                                $value['images'] = $paths;
+                                Log::info('Updated material value with images', ['value' => $value]);
+                            }
+                        }
+                    }
+
+                    // Guardar modelo 3D
+                    $model = Product3DModel::create([
+                        'id_product' => $product->id,
+                        'name' => $fileData['name_file'],
+                        'glb_file_path' => $glbPath,
+                        'data' => $structure
+                    ]);
+
+                    $models[] = $model;
                 }
             }
 
@@ -746,12 +755,23 @@ class ProductController extends Controller
                 }
             }
 
+            // Asociar productos relacionados
+            if ($request->has('products_related')) {
+                foreach ($request->products_related as $relatedProductId) {
+                    ProductsRelated::create([
+                        'id_product' => $product->id,
+                        'id_product_related' => $relatedProductId
+                    ]);
+                }
+            }
+
             $product = Product::with([
                 'categories',
                 'materials.material',
                 'attributes.attribute',
                 'gallery',
-                'components'
+                'components',
+                'relatedProducts.related'
             ])->findOrFail($product->id);
 
             // Limpiar datos del pivot para cada relación
@@ -795,8 +815,6 @@ class ProductController extends Controller
                 'description_underline' => 'nullable|required|in:1,0',
                 'status' => 'required|integer|exists:product_status,id',
                 'main_img' => 'nullable',
-                'customizable' => 'nullable|boolean',
-                '3d_file' => 'nullable|file|mimes:glb,gltf,zip|max:50480',
                 'sub_img' => 'nullable',
                 'main_video' => 'nullable',
                 'file_data_sheet' => 'nullable',
@@ -808,25 +826,23 @@ class ProductController extends Controller
                 'gallery.*.id' => 'sometimes|exists:product_galleries,id',
                 'gallery.*.file' => 'nullable',
                 'gallery.*' => 'nullable',
-                'attribute_3d' => 'array',
-                'attribute_3d.*.id_attribute' => 'nullable|integer|exists:attributes,id',
-                'attribute_3d.*.file' => 'nullable|file|mimes:glb,gltf,zip|max:50480',
                 'materials_values' => 'array',
                 'materials_values.*.id_material_value' => 'required|integer|exists:material_values,id',
                 'materials_values.*.img' => 'nullable',
                 'attributes_values' => 'array',
                 'attributes_values.*.id_attribute_value' => 'required|integer|exists:attribute_values,id',
                 'attributes_values.*.img' => 'nullable',
-                'product_material_value' => 'array',
-                'product_material_value.*.id' => 'nullable|integer|exists:product_material_value,id',
-                'product_material_value.*.id_material_value' => 'nullable|integer|exists:material_values,id',
-                'product_material_value.*.img' => 'nullable|file|mimes:jpg,jpeg,png,webp',
-                'product_attribute_value' => 'array',
-                'product_attribute_value.*.id' => 'nullable|integer|exists:product_attribute_value,id',
-                'product_attribute_value.*.id_attribute_value' => 'nullable|integer|exists:attribute_values,id',
-                'product_attribute_value.*.img' => 'nullable|file|mimes:jpg,jpeg,png,webp',
+                'customizable' => 'required|boolean',
+                '3d_files' => 'array',
+                '3d_files.*.name_file' => 'required|string|max:100',
+                '3d_files.*.glb_file' => 'nullable|file',
+                '3d_files.*.data' => 'required|json',
+                '3d_files.*.id' => 'sometimes|integer|exists:product_3d_models,id',
+                'deleted_3d_files' => 'nullable|array',
                 'components' => 'array',
                 'components.*' => 'integer|exists:components,id',
+                'products_related' => 'nullable|array',
+                'products_related.*' => 'integer|exists:products,id',
             ]);
 
             if ($validator->fails()) {
@@ -835,124 +851,90 @@ class ProductController extends Controller
 
             $product = Product::findOrFail($id);
 
-            $baseStoragePath = public_path('storage/products');
-
-            // Crear directorios si no existen
-            if (!file_exists("$baseStoragePath/images"))
-                mkdir("$baseStoragePath/images", 0755, true);
-            if (!file_exists("$baseStoragePath/videos"))
-                mkdir("$baseStoragePath/videos", 0755, true);
-            if (!file_exists("$baseStoragePath/data_sheets"))
-                mkdir("$baseStoragePath/data_sheets", 0755, true);
-            if (!file_exists("$baseStoragePath/gallery"))
-                mkdir("$baseStoragePath/gallery", 0755, true);
-            if (!file_exists("$baseStoragePath/materials"))
-                mkdir("$baseStoragePath/materials", 0755, true);
-            if (!file_exists("$baseStoragePath/attributes"))
-                mkdir("$baseStoragePath/attributes", 0755, true);
-            if (!file_exists("$baseStoragePath/3d/attributes"))
-                mkdir("$baseStoragePath/3d/attributes", 0755, true);
+            // No need to create directories manually when using Storage facade
 
             // Manejo de main_img
             if ($request->has('main_img')) {
                 if (is_null($request->main_img)) {
-                    if ($product->main_img && file_exists(public_path($product->main_img))) {
-                        unlink(public_path($product->main_img));
+                    if ($product->main_img && FileStorageService::fileExists($product->main_img)) {
+                        FileStorageService::deleteFile($product->main_img);
                     }
-                    if ($product->main_img && file_exists(public_path($product->thumbnail_main_img)) && $product->thumbnail_main_img != null) {
-                        unlink(public_path($product->thumbnail_main_img));
+                    if ($product->thumbnail_main_img && FileStorageService::fileExists($product->thumbnail_main_img)) {
+                        FileStorageService::deleteFile($product->thumbnail_main_img);
                     }
                     $product->main_img = null;
                     $product->thumbnail_main_img = null;
                 } elseif ($request->hasFile('main_img')) {
-                    if ($product->main_img && file_exists(public_path($product->main_img))) {
-                        unlink(public_path($product->main_img));
+                    if ($product->main_img && FileStorageService::fileExists($product->main_img)) {
+                        FileStorageService::deleteFile($product->main_img);
                     }
-                    if ($product->main_img && file_exists(public_path($product->thumbnail_main_img)) && $product->thumbnail_main_img != null) {
-                        unlink(public_path($product->thumbnail_main_img));
+                    if ($product->thumbnail_main_img && FileStorageService::fileExists($product->thumbnail_main_img)) {
+                        FileStorageService::deleteFile($product->thumbnail_main_img);
                     }
 
-                    // Generar nombre aleatorio
-                    $randomName = uniqid() . '_' . $request->file('main_img')->getClientOriginalName();
-                    $mainImgThumbnailPath = ImageHelper::saveReducedImage(
+                    $product->main_img = FileStorageService::storeFile($request->file('main_img'), 'storage/products/images');
+                    $product->thumbnail_main_img = ImageHelper::saveReducedImage(
                         $request->file('main_img'),
                         "storage/products/images/",
                     );
-                    $destinationPath = public_path('storage/products/images/');
-                    $request->file('main_img')->move($destinationPath, $randomName);
-                    $product->main_img = 'storage/products/images/' . $randomName;
-                    $product->thumbnail_main_img = $mainImgThumbnailPath;
                 }
             }
 
             if ($request->has('sub_img')) {
                 if (is_null($request->sub_img)) {
-                    if ($product->sub_img && file_exists(public_path($product->sub_img))) {
-                        unlink(public_path($product->sub_img));
+                    if ($product->sub_img && FileStorageService::fileExists($product->sub_img)) {
+                        FileStorageService::deleteFile($product->sub_img);
                     }
-                    if ($product->sub_img && file_exists(public_path($product->thumbnail_sub_img)) && $product->thumbnail_sub_img != null) {
-                        unlink(public_path($product->thumbnail_sub_img));
+                    if ($product->thumbnail_sub_img && FileStorageService::fileExists($product->thumbnail_sub_img)) {
+                        FileStorageService::deleteFile($product->thumbnail_sub_img);
                     }
                     $product->sub_img = null;
                     $product->thumbnail_sub_img = null;
                 } elseif ($request->hasFile('sub_img')) {
-                    if ($product->sub_img && file_exists(public_path($product->sub_img))) {
-                        unlink(public_path($product->sub_img));
+                    if ($product->sub_img && FileStorageService::fileExists($product->sub_img)) {
+                        FileStorageService::deleteFile($product->sub_img);
                     }
-                    if ($product->sub_img && file_exists(public_path($product->thumbnail_sub_img)) && $product->thumbnail_sub_img != null) {
-                        unlink(public_path($product->thumbnail_sub_img));
+                    if ($product->thumbnail_sub_img && FileStorageService::fileExists($product->thumbnail_sub_img)) {
+                        FileStorageService::deleteFile($product->thumbnail_sub_img);
                     }
 
-                    // Generar nombre aleatorio
-                    $randomName = uniqid() . '_' . $request->file('sub_img')->getClientOriginalName();
-                    $subImgThumbnailPath = ImageHelper::saveReducedImage(
+                    $product->sub_img = FileStorageService::storeFile($request->file('sub_img'), 'storage/products/images');
+                    $product->thumbnail_sub_img = ImageHelper::saveReducedImage(
                         $request->file('sub_img'),
                         "storage/products/images/",
                     );
-                    $destinationPath = public_path('storage/products/images/');
-                    $request->file('sub_img')->move($destinationPath, $randomName);
-                    $product->sub_img = 'storage/products/images/' . $randomName;
-                    $product->thumbnail_main_img = $subImgThumbnailPath;
                 }
             }
 
             // Manejo de main_video
             if ($request->has('main_video')) {
                 if (is_null($request->main_video)) {
-                    if ($product->main_video && file_exists(public_path($product->main_video))) {
-                        unlink(public_path($product->main_video));
+                    if ($product->main_video && FileStorageService::fileExists($product->main_video)) {
+                        FileStorageService::deleteFile($product->main_video);
                     }
                     $product->main_video = null;
                 } elseif ($request->hasFile('main_video')) {
-                    if ($product->main_video && file_exists(public_path($product->main_video))) {
-                        unlink(public_path($product->main_video));
+                    if ($product->main_video && FileStorageService::fileExists($product->main_video)) {
+                        FileStorageService::deleteFile($product->main_video);
                     }
 
-                    // Generar nombre aleatorio
-                    $randomName = uniqid() . '_' . $request->file('main_video')->getClientOriginalName();
-                    $destinationPath = public_path('storage/products/videos/');
-                    $request->file('main_video')->move($destinationPath, $randomName);
-                    $product->main_video = 'storage/products/videos/' . $randomName;
+                    $product->main_video = FileStorageService::storeFile($request->file('main_video'), 'storage/products/videos');
                 }
             }
 
             // Manejo de file_data_sheet
             if ($request->has('file_data_sheet')) {
                 if (is_null($request->file_data_sheet)) {
-                    if ($product->file_data_sheet && file_exists(public_path($product->file_data_sheet))) {
-                        unlink(public_path($product->file_data_sheet));
+                    if ($product->file_data_sheet && FileStorageService::fileExists($product->file_data_sheet)) {
+                        FileStorageService::deleteFile($product->file_data_sheet);
                     }
                     $product->file_data_sheet = null;
                 } elseif ($request->hasFile('file_data_sheet')) {
-                    if ($product->file_data_sheet && file_exists(public_path($product->file_data_sheet))) {
-                        unlink(public_path($product->file_data_sheet));
+                    if ($product->file_data_sheet && FileStorageService::fileExists($product->file_data_sheet)) {
+                        FileStorageService::deleteFile($product->file_data_sheet);
                     }
 
-                    // Generar nombre aleatorio
-                    $randomName = uniqid() . '_' . $request->file('file_data_sheet')->getClientOriginalName();
-                    $destinationPath = public_path('storage/products/data_sheets/');
-                    $request->file('file_data_sheet')->move($destinationPath, $randomName);
-                    $product->file_data_sheet = 'storage/products/data_sheets/' . $randomName;
+                    $product->file_data_sheet = FileStorageService::storeFile($request->file('file_data_sheet'), 'storage/products/data_sheets');
                 }
             }
 
@@ -969,6 +951,7 @@ class ProductController extends Controller
                 'status' => $request->status,
                 'featured' => $request->featured,
                 'meta_data' => $newMetaData,
+                'customizable' => $request->customizable,
             ]);
 
             // Actualizar categorías asociadas
@@ -996,25 +979,23 @@ class ProductController extends Controller
                         $gallery = ProductGallery::findOrFail($galleryItem['id']);
 
                         // Si el 'file' ha cambiado (es un archivo), eliminamos la imagen antigua
-                        if (file_exists(public_path($gallery->file))) {
-                            unlink(public_path($gallery->file));
+                        if ($gallery->file && FileStorageService::fileExists($gallery->file)) {
+                            FileStorageService::deleteFile($gallery->file);
                         }
 
-                        if (file_exists(public_path($gallery->thumbnail_file)) && $gallery->thumbnail_file != null) {
-                            unlink(public_path($gallery->thumbnail_file));
+                        if ($gallery->thumbnail_file && FileStorageService::fileExists($gallery->thumbnail_file)) {
+                            FileStorageService::deleteFile($gallery->thumbnail_file);
                         }
 
                         // Guardamos la nueva imagen
-                        $randomName = uniqid() . '_' . $galleryItem['file']->getClientOriginalName();
+                        $newFilePath = FileStorageService::storeFile($galleryItem['file'], 'storage/products/gallery');
                         $fileThumbnailPath = ImageHelper::saveReducedImage(
                             $galleryItem['file'],
                             "storage/products/gallery/",
                         );
-                        $destinationPath = public_path('storage/products/gallery/');
-                        $galleryItem['file']->move($destinationPath, $randomName);
                         $gallery->update(
                             [
-                                'file' => 'storage/products/gallery/' . $randomName,
+                                'file' => $newFilePath,
                                 'thumbnail_file' => $fileThumbnailPath
                             ]
                         );
@@ -1022,16 +1003,14 @@ class ProductController extends Controller
 
                     // Si el 'id' está vacío, es una nueva imagen, se sube el archivo
                     if (empty($galleryItem['id']) && isset($galleryItem['file'])) {
-                        $randomName = uniqid() . '_' . $galleryItem['file']->getClientOriginalName();
+                        $newFilePath = FileStorageService::storeFile($galleryItem['file'], 'storage/products/gallery');
                         $newFileThumbnailPath = ImageHelper::saveReducedImage(
                             $galleryItem['file'],
                             "storage/products/gallery/",
                         );
-                        $destinationPath = public_path('storage/products/gallery/');
-                        $galleryItem['file']->move($destinationPath, $randomName);
                         $product->gallery()->create(
                             [
-                                'file' => 'storage/products/gallery/' . $randomName,
+                                'file' => $newFilePath,
                                 'thumbnail_file' => $newFileThumbnailPath
                             ]
                         );
@@ -1042,13 +1021,12 @@ class ProductController extends Controller
                         $gallery = ProductGallery::findOrFail($galleryItem['id']);
 
                         // Eliminar la imagen
-                        if (file_exists(public_path($gallery->file))) {
-                            unlink(public_path($gallery->file));
+                        if ($gallery->file && FileStorageService::fileExists($gallery->file)) {
+                            FileStorageService::deleteFile($gallery->file);
                         }
-                        if (file_exists(public_path($gallery->thumbnail_file)) && $gallery->thumbnail_file !== null) {
-                            unlink(public_path($gallery->thumbnail_file));
+                        if ($gallery->thumbnail_file && FileStorageService::fileExists($gallery->thumbnail_file)) {
+                            FileStorageService::deleteFile($gallery->thumbnail_file);
                         }
-
 
                         $gallery->delete();
                     }
@@ -1061,93 +1039,19 @@ class ProductController extends Controller
                 foreach ($idsToDelete as $id) {
                     $gallery = ProductGallery::findOrFail($id);
 
+
                     // Eliminar la imagen de la galería
-                    if (file_exists(public_path($gallery->file))) {
-                        unlink(public_path($gallery->file));
+                    if ($gallery->file && FileStorageService::fileExists($gallery->file)) {
+                        FileStorageService::deleteFile($gallery->file);
                     }
-                    if (file_exists(public_path($gallery->thumbnail_file)) && $gallery->thumbnail_file !== null) {
-                        unlink(public_path($gallery->thumbnail_file));
+                    if ($gallery->thumbnail_file && FileStorageService::fileExists($gallery->thumbnail_file)) {
+                        FileStorageService::deleteFile($gallery->thumbnail_file);
                     }
 
                     $gallery->delete();
                 }
             }
 
-            $base3DFilePath = null;
-
-            if ($request->hasFile('3d_file') && $request->customizable == 1) {
-                // Eliminar archivo anterior si existe
-                if ($product['3d_file'] && file_exists(public_path($product['3d_file']))) {
-                    unlink(public_path($product['3d_file']));
-                }
-
-                $uniqueName = uniqid() . '_' . $request->file('3d_file')->getClientOriginalName();
-                $base3DFilePath = $request->file('3d_file')->move("$baseStoragePath/3d", $uniqueName);
-
-                $product->update([
-                    '3d_file' => "storage/products/3d/" . basename($base3DFilePath),
-                ]);
-            }
-
-            if ($request->customizable == 0) {
-                $product->update([
-                    'customizable' => 0,
-                    '3d_file' => null,
-                ]);
-            }
-
-            // Manejo de archivos 3D por atributo
-            if ($request->has('attribute_3d')) {
-                $sentAttributeIds = [];
-                
-                foreach ($request->attribute_3d as $index => $attribute3D) {
-                    if (isset($attribute3D['id_attribute'])) {
-                        $sentAttributeIds[] = $attribute3D['id_attribute']; // Guardamos los que vienen
-            
-                        // Buscamos el registro existente
-                        $existingRecord = ProductParentAttribute::where('id_product', $product->id)
-                            ->where('id_attribute', $attribute3D['id_attribute'])
-                            ->first();
-            
-                        $filePath = $existingRecord['3d_file'] ?? null;
-            
-                        if ($request->hasFile("attribute_3d.$index.file")) {
-                            $file = $request->file("attribute_3d.$index.file");
-                            $uniqueName = uniqid() . '_' . $file->getClientOriginalName();
-                            $storedPath = $file->move("$baseStoragePath/3d/attributes", $uniqueName);
-                            $filePath = "storage/products/3d/attributes/" . basename($storedPath);
-            
-                            // Eliminamos el archivo anterior si existe
-                            if ($existingRecord && $existingRecord['3d_file'] && file_exists(public_path($existingRecord['3d_file']))) {
-                                unlink(public_path($existingRecord['3d_file']));
-                            }
-                        }
-            
-                        if ($existingRecord) {
-                            $existingRecord->update([
-                                '3d_file' => $filePath,
-                            ]);
-                        } else {
-                            ProductParentAttribute::create([
-                                'id_product' => $product->id,
-                                'id_attribute' => $attribute3D['id_attribute'],
-                                '3d_file' => $filePath,
-                            ]);
-                        }
-                    }
-                }
-            
-                // 🔁 Eliminamos los que ya no vinieron
-                $existingAttributes = ProductParentAttribute::where('id_product', $product->id)->get();
-                foreach ($existingAttributes as $record) {
-                    if (!in_array($record->id_attribute, $sentAttributeIds)) {
-                        if ($record['3d_file'] && file_exists(public_path($record['3d_file']))) {
-                            unlink(public_path($record['3d_file']));
-                        }
-                        $record->delete();
-                    }
-                }
-            }
 
             // Actualizar materiales asociados
             if (!$request->has('materials_values') || empty($request->materials_values)) {
@@ -1156,12 +1060,12 @@ class ProductController extends Controller
 
                 foreach ($productMaterials as $material) {
                     // Eliminar la imagen si existe
-                    if ($material->img && file_exists(public_path($material->img))) {
-                        unlink(public_path($material->img));
+                    if ($material->img && FileStorageService::fileExists($material->img)) {
+                        FileStorageService::deleteFile($material->img);
                     }
 
-                    if ($material->img && file_exists(public_path($material->thumbnail_img)) && $material->thumbnail_img !== null) {
-                        unlink(public_path($material->thumbnail_img));
+                    if ($material->thumbnail_img && FileStorageService::fileExists($material->thumbnail_img)) {
+                        FileStorageService::deleteFile($material->thumbnail_img);
                     }
 
                     // Eliminar el registro de la base de datos
@@ -1176,12 +1080,12 @@ class ProductController extends Controller
                 foreach ($existingMaterials as $existingMaterial) {
                     if (!in_array($existingMaterial->id_material, $sentMaterialIds)) {
                         // Eliminar la imagen si existe
-                        if ($existingMaterial->img && file_exists(public_path($existingMaterial->img))) {
-                            unlink(public_path($existingMaterial->img));
+                        if ($existingMaterial->img && FileStorageService::fileExists($existingMaterial->img)) {
+                            FileStorageService::deleteFile($existingMaterial->img);
                         }
 
-                        if ($existingMaterial->img && file_exists(public_path($existingMaterial->thumbnail_img)) && $existingMaterial->thumbnail_img !== null) {
-                            unlink(public_path($existingMaterial->thumbnail_img));
+                        if ($existingMaterial->thumbnail_img && FileStorageService::fileExists($existingMaterial->thumbnail_img)) {
+                            FileStorageService::deleteFile($existingMaterial->thumbnail_img);
                         }
                         // Eliminar el material del producto
                         $existingMaterial->delete();
@@ -1201,33 +1105,28 @@ class ProductController extends Controller
                     if ($existingMaterial) {
                         if ($request->hasFile("materials_values.$index.img")) {
                             // Si se envía una nueva imagen, eliminar la anterior si es diferente
-                            if ($existingMaterial->img && file_exists(public_path($existingMaterial->img))) {
-                                unlink(public_path($existingMaterial->img));
+                            if ($existingMaterial->img && FileStorageService::fileExists($existingMaterial->img)) {
+                                FileStorageService::deleteFile($existingMaterial->img);
                             }
 
-                            if ($existingMaterial->img && file_exists(public_path($existingMaterial->thumbnail_img)) && $existingMaterial->thumbnail_img !== null) {
-                                unlink(public_path($existingMaterial->thumbnail_img));
+                            if ($existingMaterial->thumbnail_img && FileStorageService::fileExists($existingMaterial->thumbnail_img)) {
+                                FileStorageService::deleteFile($existingMaterial->thumbnail_img);
                             }
 
-                            $materialThumbnailPath = ImageHelper::saveReducedImage(
+                            $materialImgPath = FileStorageService::storeFile($request->file("materials_values.$index.img"), 'storage/products/materials');
+                            $materialThumbnailImgPath = ImageHelper::saveReducedImage(
                                 $request->file("materials_values.$index.img"),
                                 "storage/products/materials/",
                             );
-                            // Guardar la nueva imagen
-                            $randomName = uniqid() . '_' . $request->file("materials_values.$index.img")->getClientOriginalName();
-                            $destinationPath = public_path('storage/products/materials/');
-                            $request->file("materials_values.$index.img")->move($destinationPath, $randomName);
-                            $materialImgPath = 'storage/products/materials/' . $randomName;
-                            $materialThumbnailImgPath = $materialThumbnailPath;
 
                         } elseif (!isset($material['img'])) {
                             // Si 'img' no está definido, eliminar la imagen existente
-                            if ($existingMaterial->img && file_exists(public_path($existingMaterial->img))) {
-                                unlink(public_path($existingMaterial->img));
+                            if ($existingMaterial->img && FileStorageService::fileExists($existingMaterial->img)) {
+                                FileStorageService::deleteFile($existingMaterial->img);
                             }
 
-                            if ($existingMaterial->img && file_exists(public_path($existingMaterial->thumbnail_img)) && $existingMaterial->thumbnail_img !== null) {
-                                unlink(public_path($existingMaterial->thumbnail_img));
+                            if ($existingMaterial->thumbnail_img && FileStorageService::fileExists($existingMaterial->thumbnail_img)) {
+                                FileStorageService::deleteFile($existingMaterial->thumbnail_img);
                             }
                             $materialImgPath = null; // Se elimina la referencia a la imagen
                             $materialThumbnailImgPath = null;
@@ -1235,15 +1134,11 @@ class ProductController extends Controller
                     } else {
                         // Crear material nuevo con imagen solo si se ha enviado una
                         if ($request->hasFile("materials_values.$index.img")) {
-                            $newMaterialThumbnailPath = ImageHelper::saveReducedImage(
+                            $materialImgPath = FileStorageService::storeFile($request->file("materials_values.$index.img"), 'storage/products/materials');
+                            $materialThumbnailImgPath = ImageHelper::saveReducedImage(
                                 $request->file("materials_values.$index.img"),
                                 "storage/products/materials/",
                             );
-                            $randomName = uniqid() . '_' . $request->file("materials_values.$index.img")->getClientOriginalName();
-                            $destinationPath = public_path('storage/products/materials/');
-                            $request->file("materials_values.$index.img")->move($destinationPath, $randomName);
-                            $materialImgPath = 'storage/products/materials/' . $randomName;
-                            $materialThumbnailImgPath = $newMaterialThumbnailPath;
                         }
                     }
 
@@ -1252,79 +1147,6 @@ class ProductController extends Controller
                         ['id_product' => $product->id, 'id_material' => $material['id_material_value']],
                         ['img' => $materialImgPath, 'thumbnail_img' => $materialThumbnailImgPath]
                     );
-                }
-            }
-
-            $existingValues = ProductMaterialValue::where('id_product', $product->id)->get();
-            $existingIds = $existingValues->pluck('id')->toArray(); // estos son los id reales (PK)
-
-            $productMaterialMap = ProductMaterial::where('id_product', $product->id)
-                ->pluck('id', 'id_material') // [id_material => id_product_material_value]
-                ->toArray();
-
-            $sentIds = [];
-
-            if ($request->has('product_material_value')) {
-                foreach ($request->product_material_value as $index => $materialValue) {
-                    // Verificamos si existe el valor de mapeo
-                    if (!isset($productMaterialMap[$materialValue['id_material_value']])) {
-                        continue;
-                    }
-
-                    $productMaterialId = $productMaterialMap[$materialValue['id_material_value']];
-                    $imgPath = null;
-                    $thumbnailPath = null;
-
-                    $value = null;
-                    if (isset($materialValue['id'])) {
-                        $value = ProductMaterialValue::find($materialValue['id']);
-                        $sentIds[] = $value->id;
-                        $imgPath = $value->img;
-                        $thumbnailPath = $value->thumbnail_img;
-                    }
-
-                    // Subida de imagen
-                    if ($request->hasFile("product_material_value.$index.img")) {
-                        if ($value) {
-                            if ($value->img && file_exists(public_path($value->img))) {
-                                unlink(public_path($value->img));
-                            }
-                            if ($value->thumbnail_img && file_exists(public_path($value->thumbnail_img))) {
-                                unlink(public_path($value->thumbnail_img));
-                            }
-                        }
-
-                        $file = $request->file("product_material_value.$index.img");
-                        $uniqueName = uniqid() . '_' . $file->getClientOriginalName();
-
-                        $thumbnailPath = ImageHelper::saveReducedImage($file, "storage/products/materials/");
-                        $storedPath = $file->move(public_path('storage/products/materials'), $uniqueName);
-                        $imgPath = 'storage/products/materials/' . $uniqueName;
-                    }
-
-                    // Crear o actualizar
-                    ProductMaterialValue::updateOrCreate(
-                        ['id' => $materialValue['id'] ?? 0], // Si no hay ID, lo crea
-                        [
-                            'id_product' => $product->id,
-                            'id_product_material_value' => $productMaterialId,
-                            'img' => $imgPath,
-                            'thumbnail_img' => $thumbnailPath
-                        ]
-                    );
-                }
-            }
-
-            // Eliminar los que no vinieron
-            foreach ($existingValues as $value) {
-                if (!in_array($value->id, $sentIds)) {
-                    if ($value->img && file_exists(public_path($value->img))) {
-                        unlink(public_path($value->img));
-                    }
-                    if ($value->thumbnail_img && file_exists(public_path($value->thumbnail_img))) {
-                        unlink(public_path($value->thumbnail_img));
-                    }
-                    $value->delete();
                 }
             }
 
@@ -1348,12 +1170,12 @@ class ProductController extends Controller
 
                     if ($attributeInstance) {
                         // Eliminar la imagen si existe
-                        if ($attributeInstance->img && file_exists(public_path($attributeInstance->img))) {
-                            unlink(public_path($attributeInstance->img));
+                        if ($attributeInstance->img && FileStorageService::fileExists($attributeInstance->img)) {
+                            FileStorageService::deleteFile($attributeInstance->img);
                         }
 
-                        if ($attributeInstance->img && file_exists(public_path($attributeInstance->thumbnail_img)) && $attributeInstance->thumbnail_img != null) {
-                            unlink(public_path($attributeInstance->thumbnail_img));
+                        if ($attributeInstance->thumbnail_img && FileStorageService::fileExists($attributeInstance->thumbnail_img)) {
+                            FileStorageService::deleteFile($attributeInstance->thumbnail_img);
                         }
 
                         // Eliminar el registro de la base de datos
@@ -1375,32 +1197,29 @@ class ProductController extends Controller
                         $attributeImgPath = $attributeInstance ? $attributeInstance->img : null;
                     } elseif (isset($attribute['img']) && $attribute['img'] === null) {
                         // Elimina la imagen actual si se pasa null
-                        if ($attributeInstance && $attributeInstance->img && file_exists(public_path($attributeInstance->img))) {
-                            unlink(public_path($attributeInstance->img));
+                        if ($attributeInstance && $attributeInstance->img && FileStorageService::fileExists($attributeInstance->img)) {
+                            FileStorageService::deleteFile($attributeInstance->img);
                         }
 
-                        if ($attributeInstance && $attributeInstance->img && file_exists(public_path($attributeInstance->thumbnail_img)) && $attributeInstance->thumbnail_img != null) {
-                            unlink(public_path($attributeInstance->thumbnail_img));
+                        if ($attributeInstance && $attributeInstance->thumbnail_img && FileStorageService::fileExists($attributeInstance->thumbnail_img)) {
+                            FileStorageService::deleteFile($attributeInstance->thumbnail_img);
                         }
                         $attributeImgPath = null;
                         $attributeThumbnailImgPath = null;
                     } elseif ($request->hasFile("attributes_values.$index.img")) {
                         // Actualiza con la nueva imagen si hay un archivo
-                        if ($attributeInstance && $attributeInstance->img && file_exists(public_path($attributeInstance->img))) {
-                            unlink(public_path($attributeInstance->img));
+                        if ($attributeInstance && $attributeInstance->img && FileStorageService::fileExists($attributeInstance->img)) {
+                            FileStorageService::deleteFile($attributeInstance->img);
                         }
-                        if ($attributeInstance && $attributeInstance->img && file_exists(public_path($attributeInstance->thumbnail_img)) && $attributeInstance->thumbnail_img != null) {
-                            unlink(public_path($attributeInstance->thumbnail_img));
+                        if ($attributeInstance && $attributeInstance->thumbnail_img && FileStorageService::fileExists($attributeInstance->thumbnail_img)) {
+                            FileStorageService::deleteFile($attributeInstance->thumbnail_img);
                         }
-                        $attributeThumbnailPath = ImageHelper::saveReducedImage(
+
+                        $attributeImgPath = FileStorageService::storeFile($request->file("attributes_values.$index.img"), 'storage/products/attributes');
+                        $attributeThumbnailImgPath = ImageHelper::saveReducedImage(
                             $request->file("attributes_values.$index.img"),
                             "storage/products/attributes/",
                         );
-                        $randomName = uniqid() . '_' . $request->file("attributes_values.$index.img")->getClientOriginalName();
-                        $destinationPath = public_path('storage/products/attributes/');
-                        $request->file("attributes_values.$index.img")->move($destinationPath, $randomName);
-                        $attributeImgPath = 'storage/products/attributes/' . $randomName;
-                        $attributeThumbnailImgPath = $attributeThumbnailPath;
                     }
 
                     // Actualiza o crea la relación con la nueva imagen
@@ -1418,12 +1237,12 @@ class ProductController extends Controller
 
                 foreach ($existingAttributes as $attributeInstance) {
                     // Eliminar la imagen si existe
-                    if ($attributeInstance->img && file_exists(public_path($attributeInstance->img))) {
-                        unlink(public_path($attributeInstance->img));
+                    if ($attributeInstance->img && FileStorageService::fileExists($attributeInstance->img)) {
+                        FileStorageService::deleteFile($attributeInstance->img);
                     }
 
-                    if ($attributeInstance->img && file_exists(public_path($attributeInstance->thumbnail_img)) && $attributeInstance->thumbnail_img != null) {
-                        unlink(public_path($attributeInstance->thumbnail_img));
+                    if ($attributeInstance->thumbnail_img && FileStorageService::fileExists($attributeInstance->thumbnail_img)) {
+                        FileStorageService::deleteFile($attributeInstance->thumbnail_img);
                     }
 
                     // Eliminar el atributo
@@ -1431,90 +1250,148 @@ class ProductController extends Controller
                 }
             }
 
-            $existingValues = ProductAttributeValue::where('id_product', $product->id)->get();
-            $existingIds = $existingValues->pluck('id')->toArray();
+            if ($request->has('3d_files') && is_array($request->input('3d_files')) && $request->has('customizable') && $request->customizable) {
+                foreach ($request->input('3d_files') as $index => $fileData) {
+                    $glbFile = $request->file("3d_files.$index.glb_file");
+                    $structureJson = $fileData['data'];
+                    $structure = json_decode($structureJson, true);
+                    $modelId = $fileData['id'] ?? null;
 
-            $productAttributeMap = ProductAttribute::where('id_product', $product->id)
-                ->pluck('id', 'id_attribute_value') // [id_attribute => id_product_attribute]
-                ->toArray();
+                    // Buscar modelo existente o crear uno nuevo
+                    $model = $modelId ? Product3DModel::find($modelId) : new Product3DModel();
 
-            $sentIds = [];
+                    // Actualizar nombre del archivo
+                    $model->name = $fileData['name_file'];
+                    $model->id_product = $product->id;
 
-            Log::info($productAttributeMap);
-
-            if ($request->has('product_attribute_value')) {
-                foreach ($request->product_attribute_value as $index => $attributeValue) {
-                    // Verificamos si existe el valor de mapeo
-                    if (!isset($productAttributeMap[$attributeValue['id_attribute_value']])) {
-                        continue;
+                    // Si hay archivo glb nuevo, lo actualizamos
+                    if ($glbFile) {
+                        $model->glb_file_path = FileStorageService::storeFile($glbFile, 'storage/products/3d');
                     }
 
-                    Log::info("aquiii");
-                    Log::info($productAttributeMap[$attributeValue['id_attribute_value']]);
+                    $allFiles = $request->file('3d_files');
 
-                    $productAttributeId = $productAttributeMap[$attributeValue['id_attribute_value']];
-                    Log::info("productAttributeId");
-                    Log::info($productAttributeId);
-                    $imgPath = null;
-                    $thumbnailPath = null;
+                    // Procesar imágenes de atributos
+                    if (isset($structure['attributes'])) {
+                        foreach ($structure['attributes'] as &$attribute) {
+                            foreach ($attribute['values'] as &$value) {
+                                $imageKey = "attribute_{$attribute['id']}_value_{$value['id']}";
+                                $images = $allFiles[$index]['images'][$imageKey] ?? null;
 
-                    $value = null;
-                    if (isset($attributeValue['id'])) {
-                        $value = ProductAttributeValue::find($attributeValue['id']);
-                        $sentIds[] = $value->id;
-                        $imgPath = $value->img;
-                        $thumbnailPath = $value->thumbnail_img;
-                    }
+                                $paths = [];
 
-                    // Subida de imagen
-                    if ($request->hasFile("product_attribute_value.$index.img")) {
-                        if ($value) {
-                            if ($value->img && file_exists(public_path($value->img))) {
-                                unlink(public_path($value->img));
+                                if (is_array($images)) {
+                                    foreach ($images as $image) {
+                                        $paths[] = FileStorageService::storeFile($image, 'storage/products/3d/attributes');
+                                    }
+                                } elseif ($images instanceof \Illuminate\Http\UploadedFile) {
+                                    $paths[] = FileStorageService::storeFile($images, 'storage/products/3d/attributes');
+                                }
+
+                                // Fusionar imágenes nuevas con las existentes si hay
+                                if (!empty($paths)) {
+                                    $existingImages = $value['images'] ?? [];
+                                    $value['images'] = array_merge($existingImages, $paths);
+                                }
                             }
-                            if ($value->thumbnail_img && file_exists(public_path($value->thumbnail_img))) {
-                                unlink(public_path($value->thumbnail_img));
+                        }
+                    }
+
+                    // Procesar imágenes de materiales
+                    if (isset($structure['materials'])) {
+                        foreach ($structure['materials'] as &$material) {
+                            foreach ($material['values'] as &$value) {
+                                $imageKey = "material_{$material['id']}_value_{$value['id']}";
+                                $images = $allFiles[$index]['images'][$imageKey] ?? null;
+
+                                $paths = [];
+
+                                if (is_array($images)) {
+                                    foreach ($images as $image) {
+                                        $paths[] = FileStorageService::storeFile($image, 'storage/products/3d/materials');
+                                    }
+                                } elseif ($images instanceof \Illuminate\Http\UploadedFile) {
+                                    $paths[] = FileStorageService::storeFile($images, 'storage/products/3d/materials');
+                                }
+
+                                // Fusionar imágenes nuevas con las existentes si hay
+                                if (!empty($paths)) {
+                                    $existingImages = $value['images'] ?? [];
+                                    $value['images'] = array_merge($existingImages, $paths);
+                                }
+                            }
+                        }
+                    }
+
+
+                    // Guardar estructura actualizada
+                    $model->data = $structure;
+                    $model->save();
+
+                    $models[] = $model;
+                }
+            }
+
+            if ($request->has('deleted_3d_files') && is_array($request->deleted_3d_files)) {
+                foreach ($request->deleted_3d_files as $idToDelete) {
+                    $model = Product3DModel::find($idToDelete);
+
+                    if ($model) {
+                        // Eliminar archivo .glb
+                        if ($model->glb_file_path && FileStorageService::fileExists($model->glb_file_path)) {
+                            FileStorageService::deleteFile($model->glb_file_path);
+                        }
+
+                        $structure = $model->data;
+
+                        // Eliminar imágenes de atributos
+                        if (isset($structure['attributes'])) {
+                            foreach ($structure['attributes'] as $attribute) {
+                                foreach ($attribute['values'] as $value) {
+                                    if (isset($value['images']) && is_array($value['images'])) {
+                                        foreach ($value['images'] as $imagePath) {
+                                            if (FileStorageService::fileExists($imagePath)) {
+                                                FileStorageService::deleteFile($imagePath);
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
 
-                        $file = $request->file("product_attribute_value.$index.img");
-                        $uniqueName = uniqid() . '_' . $file->getClientOriginalName();
+                        // Eliminar imágenes de materiales
+                        if (isset($structure['materials'])) {
+                            foreach ($structure['materials'] as $material) {
+                                foreach ($material['values'] as $value) {
+                                    if (isset($value['images']) && is_array($value['images'])) {
+                                        foreach ($value['images'] as $imagePath) {
+                                            if (FileStorageService::fileExists($imagePath)) {
+                                                FileStorageService::deleteFile($imagePath);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
 
-                        $thumbnailPath = ImageHelper::saveReducedImage($file, "storage/products/attributes/");
-                        $storedPath = $file->move(public_path('storage/products/attributes'), $uniqueName);
-                        $imgPath = 'storage/products/attributes/' . $uniqueName;
+                        // Eliminar el modelo de la base de datos
+                        $model->delete();
                     }
-
-                    Log::info("product attribute 22");
-                    Log::info($productAttributeId);
-
-                    // Crear o actualizar
-                    ProductAttributeValue::updateOrCreate(
-                        ['id' => $attributeValue['id'] ?? 0],
-                        [
-                            'id_product_atribute_value' => $productAttributeId,
-                            'id_product' => $product->id,
-                            'img' => $imgPath,
-                            'thumbnail_img' => $thumbnailPath
-                        ]
-                    );
                 }
             }
 
-            // Eliminar los que no vinieron
-            foreach ($existingValues as $value) {
-                if (!in_array($value->id, $sentIds)) {
-                    if ($value->img && file_exists(public_path($value->img))) {
-                        unlink(public_path($value->img));
-                    }
-                    if ($value->thumbnail_img && file_exists(public_path($value->thumbnail_img))) {
-                        unlink(public_path($value->thumbnail_img));
-                    }
-                    $value->delete();
+            // Primero eliminamos los existentes
+            ProductsRelated::where('id_product', $product->id)->delete();
+
+            // Luego agregamos los nuevos, igual que en el store
+            if ($request->has('products_related')) {
+                foreach ($request->products_related as $relatedProductId) {
+                    ProductsRelated::create([
+                        'id_product' => $product->id,
+                        'id_product_related' => $relatedProductId
+                    ]);
                 }
             }
-
-
             // Actualizar componentes asociados
             $product->components()->sync($request->components ?? []);
 
@@ -1562,22 +1439,22 @@ class ProductController extends Controller
 
             // Intentar eliminar la imagen principal si existe
             try {
-                if ($product->main_img && file_exists(public_path($product->main_img))) {
-                    unlink(public_path($product->main_img));
+                if ($product->main_img && FileStorageService::fileExists($product->main_img)) {
+                    FileStorageService::deleteFile($product->main_img);
                 }
-                if ($product->thumbnail_main_img && file_exists(public_path($product->thumbnail_main_img)) && $product->thumbnail_main_img != null) {
-                    unlink(public_path($product->thumbnail_main_img));
+                if ($product->thumbnail_main_img && FileStorageService::fileExists($product->thumbnail_main_img)) {
+                    FileStorageService::deleteFile($product->thumbnail_main_img);
                 }
             } catch (Exception $e) {
                 Log::error("Error al eliminar la imagen principal: " . $e->getMessage());
             }
 
             try {
-                if ($product->sub_img && file_exists(public_path($product->sub_img))) {
-                    unlink(public_path($product->sub_img));
+                if ($product->sub_img && FileStorageService::fileExists($product->sub_img)) {
+                    FileStorageService::deleteFile($product->sub_img);
                 }
-                if ($product->thumbnail_sub_img && file_exists(public_path($product->thumbnail_sub_img)) && $product->thumbnail_sub_img != null) {
-                    unlink(public_path($product->thumbnail_sub_img));
+                if ($product->thumbnail_sub_img && FileStorageService::fileExists($product->thumbnail_sub_img)) {
+                    FileStorageService::deleteFile($product->thumbnail_sub_img);
                 }
             } catch (Exception $e) {
                 Log::error("Error al eliminar la imagen secundaria: " . $e->getMessage());
@@ -1585,8 +1462,8 @@ class ProductController extends Controller
 
             // Intentar eliminar el video principal si existe
             try {
-                if ($product->main_video && file_exists(public_path($product->main_video))) {
-                    unlink(public_path($product->main_video));
+                if ($product->main_video && FileStorageService::fileExists($product->main_video)) {
+                    FileStorageService::deleteFile($product->main_video);
                 }
             } catch (Exception $e) {
                 Log::error("Error al eliminar el video principal: " . $e->getMessage());
@@ -1594,8 +1471,8 @@ class ProductController extends Controller
 
             // Intentar eliminar el archivo de la ficha técnica si existe
             try {
-                if ($product->file_data_sheet && file_exists(public_path($product->file_data_sheet))) {
-                    unlink(public_path($product->file_data_sheet));
+                if ($product->file_data_sheet && FileStorageService::fileExists($product->file_data_sheet)) {
+                    FileStorageService::deleteFile($product->file_data_sheet);
                 }
             } catch (Exception $e) {
                 Log::error("Error al eliminar la ficha técnica: " . $e->getMessage());
@@ -1604,11 +1481,11 @@ class ProductController extends Controller
             // Intentar eliminar las imágenes de la galería
             foreach ($product->gallery as $galleryItem) {
                 try {
-                    if (file_exists(public_path($galleryItem->file))) {
-                        unlink(public_path($galleryItem->file));
+                    if ($galleryItem->file && FileStorageService::fileExists($galleryItem->file)) {
+                        FileStorageService::deleteFile($galleryItem->file);
                     }
-                    if (file_exists(public_path($galleryItem->thumbnail_file)) && $galleryItem->thumbnail_file != null) {
-                        unlink(public_path($galleryItem->thumbnail_file));
+                    if ($galleryItem->thumbnail_file && FileStorageService::fileExists($galleryItem->thumbnail_file)) {
+                        FileStorageService::deleteFile($galleryItem->thumbnail_file);
                     }
                     $galleryItem->delete(); // Eliminar el registro en la base de datos
                 } catch (Exception $e) {
@@ -1619,11 +1496,11 @@ class ProductController extends Controller
             // Intentar eliminar imágenes de los atributos
             $product->attributes->each(function ($attribute) {
                 try {
-                    if ($attribute->pivot->img && file_exists(public_path($attribute->pivot->img))) {
-                        unlink(public_path($attribute->pivot->img));
+                    if ($attribute->pivot->img && FileStorageService::fileExists($attribute->pivot->img)) {
+                        FileStorageService::deleteFile($attribute->pivot->img);
                     }
-                    if ($attribute->pivot->thumbnail_img && file_exists(public_path($attribute->pivot->thumbnail_img)) && $attribute->pivot->thumbnail_img != null) {
-                        unlink(public_path($attribute->pivot->thumbnail_img));
+                    if ($attribute->pivot->thumbnail_img && FileStorageService::fileExists($attribute->pivot->thumbnail_img)) {
+                        FileStorageService::deleteFile($attribute->pivot->thumbnail_img);
                     }
                 } catch (Exception $e) {
                     Log::error("Error al eliminar imagen de atributo: " . $e->getMessage());
@@ -1633,11 +1510,11 @@ class ProductController extends Controller
             // Intentar eliminar imágenes de los materiales
             $product->materials->each(function ($material) {
                 try {
-                    if ($material->pivot->img && file_exists(public_path($material->pivot->img))) {
-                        unlink(public_path($material->pivot->img));
+                    if ($material->pivot->img && FileStorageService::fileExists($material->pivot->img)) {
+                        FileStorageService::deleteFile($material->pivot->img);
                     }
-                    if ($material->pivot->thumbnail_img && file_exists(public_path($material->pivot->thumbnail_img)) && $material->pivot->thumbnail_img != null) {
-                        unlink(public_path($material->pivot->thumbnail_img));
+                    if ($material->pivot->thumbnail_img && FileStorageService::fileExists($material->pivot->thumbnail_img)) {
+                        FileStorageService::deleteFile($material->pivot->thumbnail_img);
                     }
                 } catch (Exception $e) {
                     Log::error("Error al eliminar imagen de material: " . $e->getMessage());
@@ -1698,5 +1575,87 @@ class ProductController extends Controller
         }
 
         return $items;
+    }
+
+    public function generarFichaProducto(Request $request)
+    {
+        try {
+            // Validar los datos del form
+            $validated = $request->validate([
+                'product_title' => 'required|string|max:255',
+                'data' => 'required|string', // viene como string JSON
+                'image' => 'nullable|file|mimes:jpg,jpeg,png,webp|max:2048',
+            ]);
+
+            // Parsear el JSON del campo "data"
+            $sections = json_decode($validated['data'], true);
+            if (!is_array($sections)) {
+                return response()->json(['error' => 'El campo data no contiene un JSON válido.'], 400);
+            }
+
+            // Si viene imagen, la guardamos temporalmente para generar el PDF
+            $imagePath = null;
+            $tempImagePath = null;
+            if ($request->hasFile('image')) {
+                $filename = time() . '_' . $request->file('image')->getClientOriginalName();
+
+                // Store the file using FileStorageService
+                $storedPath = FileStorageService::storeFileAs($request->file('image'), 'storage/pdf-ficha', $filename);
+
+                // For PDF generation, we need the actual file path
+                // If using local storage, get the full path; if S3, download temporarily
+                $disk = Storage::disk(config('filesystems.default'));
+
+                if (config('filesystems.default') === 'local' || config('filesystems.default') === 'public') {
+                    // Local storage - get the full path
+                    $imagePath = $disk->path($storedPath);
+                } else {
+                    // S3 or other cloud storage - create a temporary local file
+                    $tempImagePath = sys_get_temp_dir() . '/' . $filename;
+                    file_put_contents($tempImagePath, $disk->get($storedPath));
+                    $imagePath = $tempImagePath;
+                }
+            }
+
+            // Datos para la vista Blade
+            $data = [
+                'product_title' => $validated['product_title'],
+                'model' => $sections,
+                'image' => $imagePath,
+            ];
+
+            // Generar PDF
+            $pdf = Pdf::loadView('pdf.ficha_producto', compact('data'))
+                ->setPaper('a4', 'portrait');
+
+            $pdfOutput = $pdf->output();
+
+            // Eliminar la imagen temporal después de generar el PDF
+            if ($tempImagePath && file_exists($tempImagePath)) {
+                unlink($tempImagePath);
+            }
+
+            // También eliminar el archivo almacenado si es temporal
+            if ($storedPath && config('filesystems.default') !== 'local') {
+                FileStorageService::deleteFile($storedPath);
+            }
+
+            // Retornar el PDF generado para descarga
+            return response($pdfOutput)
+                ->header('Content-Type', 'application/pdf')
+                ->header('Content-Disposition', 'attachment; filename="' . $data['product_title'] . '.pdf"');
+        } catch (\Throwable $e) {
+            // Log para ver el error completo en storage/logs/laravel.log
+            Log::error('Error generando ficha de producto: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            // Mostrar error al cliente (sin romper JSON)
+            return response()->json([
+                'error' => 'Ocurrió un error al generar el PDF.',
+                'exception' => $e->getMessage(), // 🔍 Mostrar mensaje real
+                // 'trace' => $e->getTrace() // <-- podés descomentar para debug
+            ], 500);
+        }
     }
 }

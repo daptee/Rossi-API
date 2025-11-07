@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Helpers\ImageHelper;
 use App\Http\Responses\ApiResponse;
+use App\Services\FileStorageService;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -108,35 +109,27 @@ class CategoriesController extends Controller
             $this->createDirectories($baseStoragePath);
 
             if ($request->hasFile('img')) {
-                $fileName = time() . '_' . $request->file('img')->getClientOriginalName();
+                $imgPath = FileStorageService::storeFile($request->file('img'), 'storage/categories/images');
                 $imgPathThumbnail = ImageHelper::saveReducedImage(
                     $request->file('img'),
                     'storage/categories/images/'
                 );
-                $request->file('img')->move($baseStoragePath . 'images/', $fileName);
-                $imgPath = 'storage/categories/images/' . $fileName;
             }
 
             if ($request->hasFile('sub_img')) {
-                $fileName = time() . '_' . $request->file('sub_img')->getClientOriginalName();
+                $subImgPath = FileStorageService::storeFile($request->file('sub_img'), 'storage/categories/images');
                 $subImgPathThumbnail = ImageHelper::saveReducedImage(
                     $request->file('sub_img'),
                     'storage/categories/images/'
                 );
-                $request->file('sub_img')->move($baseStoragePath . 'images/', $fileName);
-                $subImgPath = 'storage/categories/images/' . $fileName;
             }
 
             if ($request->hasFile('video')) {
-                $fileName = time() . '_' . $request->file('video')->getClientOriginalName();
-                $request->file('video')->move($baseStoragePath . 'videos/', $fileName);
-                $videoPath = 'storage/categories/videos/' . $fileName;
+                $videoPath = FileStorageService::storeFile($request->file('video'), 'storage/categories/videos');
             }
 
             if ($request->hasFile('icon')) {
-                $fileName = time() . '_' . $request->file('icon')->getClientOriginalName();
-                $request->file('icon')->move($baseStoragePath . 'icons/', $fileName);
-                $iconPath = 'storage/categories/icons/' . $fileName;
+                $iconPath = FileStorageService::storeFile($request->file('icon'), 'storage/categories/icons');
             }
 
             $decodedGrid = !empty($request->grid) ? json_decode($request->grid, true) : null;
@@ -147,15 +140,12 @@ class CategoriesController extends Controller
                 for ($i = 1; $i <= 3; $i++) {
                     $fileKey = 'file_' . $i;
                     if ($request->hasFile($fileKey)) {
-                        $fileName = time() . '_' . $request->file($fileKey)->getClientOriginalName();
-                        
-                        $thumbnailFile = null;
+                        $fileUrl = FileStorageService::storeFile($request->file($fileKey), 'storage/categories/grid');
+
                         $thumbnailFile = ImageHelper::saveReducedImage(
                             $request->file($fileKey),
                             'storage/categories/grid/'
                         );
-                        $request->file($fileKey)->move($baseStoragePath . 'grid/', $fileName);
-                        $fileUrl = 'storage/categories/grid/' . $fileName;
 
                         // Asignar la URL del archivo al elemento correspondiente en grid
                         $gridItemId = (string) $i;
@@ -270,7 +260,7 @@ class CategoriesController extends Controller
                 $thumbnailSubImgPath = $category->thumbnail_sub_img;
             }
             $subImgPath = $this->processField($request, 'sub_img', $category->sub_img, public_path('storage/categories/images/'));
-            
+
             $videoPath = $this->processField($request, 'video', $category->video, public_path('storage/categories/videos/'));
             $iconPath = $this->processField($request, 'icon', $category->icon, public_path('storage/categories/icons/'));
 
@@ -295,8 +285,8 @@ class CategoriesController extends Controller
                              $this->deleteFile($existingFileUrl);
                          } */
 
-                        // Guardar el nuevo archivo
-                        $fileName = time() . '_' . $request->file($fileField)->getClientOriginalName();
+                        // Guardar el nuevo archivo usando FileStorageService
+                        $fileUrl = FileStorageService::storeFile($request->file($fileField), 'storage/categories/grid');
                         $newThumbnailFile = null;
                         if ($newGridItem['props']['type'] == "Imagen") {
                             $newThumbnailFile = ImageHelper::saveReducedImage(
@@ -304,10 +294,9 @@ class CategoriesController extends Controller
                                 'storage/categories/grid/'
                             );
                         }
-                        $request->file($fileField)->move(public_path('storage/categories/grid/'), $fileName);
 
                         // Actualizar la URL del archivo en la nueva `grid`
-                        $newGridItem['props']['file']['url'] = 'storage/categories/grid/' . $fileName;
+                        $newGridItem['props']['file']['url'] = $fileUrl;
                         $newGridItem['props']['file']['thumbnail_url'] = $newThumbnailFile;
                     } /* elseif ($existingFileUrl && !isset($newGridItem['props']['file']['url'])) {
                      // Si no se envía un archivo nuevo pero había uno antiguo, eliminar el archivo antiguo
@@ -346,16 +335,18 @@ class CategoriesController extends Controller
      */
     private function createDirectories($basePath)
     {
-        if (!file_exists($basePath . 'images')) {
-            mkdir($basePath . 'images', 0777, true);
-        }
+        if (config('filesystems.default') === 'local' || config('filesystems.default') === 'public') {
+            if (!file_exists($basePath . 'images')) {
+                mkdir($basePath . 'images', 0777, true);
+            }
 
-        if (!file_exists($basePath . 'videos')) {
-            mkdir($basePath . 'videos', 0777, true);
-        }
+            if (!file_exists($basePath . 'videos')) {
+                mkdir($basePath . 'videos', 0777, true);
+            }
 
-        if (!file_exists($basePath . 'icons')) {
-            mkdir($basePath . 'icons', 0777, true);
+            if (!file_exists($basePath . 'icons')) {
+                mkdir($basePath . 'icons', 0777, true);
+            }
         }
     }
 
@@ -366,13 +357,13 @@ class CategoriesController extends Controller
     {
         // Verificar si es un archivo cargado
         if ($request->hasFile($fieldName)) {
-            if ($oldPath && file_exists(public_path($oldPath))) {
-                unlink(public_path($oldPath));
+            if ($oldPath && FileStorageService::fileExists($oldPath)) {
+                FileStorageService::deleteFile($oldPath);
             }
 
-            $fileName = time() . '_' . $request->file($fieldName)->getClientOriginalName();
-            $request->file($fieldName)->move($destination, $fileName);
-            return 'storage/categories/' . basename($destination) . '/' . $fileName;
+            // Extract the storage path from destination
+            $storagePath = 'storage/categories/' . basename($destination);
+            return FileStorageService::storeFile($request->file($fieldName), $storagePath);
         }
 
         // Verificar si es un string (URL)
@@ -484,8 +475,8 @@ class CategoriesController extends Controller
      */
     private function deleteFile($filePath)
     {
-        if (file_exists(public_path($filePath))) {
-            unlink(public_path($filePath));
+        if (FileStorageService::fileExists($filePath)) {
+            FileStorageService::deleteFile($filePath);
         }
     }
 

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Responses\ApiResponse;
-use File;
+use App\Services\FileStorageService;
 use Illuminate\Http\Request;
 use App\Models\Catalog;
 use Exception;
@@ -20,7 +20,7 @@ class CatalogController extends Controller
             return ApiResponse::create('Error al obtener los catalogos', 500, ['error' => $e->getMessage()]);
         }
     }
-    
+
     public function store(Request $request, $category)
     {
         try {
@@ -49,21 +49,19 @@ class CatalogController extends Controller
             $existingCatalog = Catalog::where('name', $categoryName)->first();
 
             if ($existingCatalog) {
-                // Eliminar el PDF anterior si existe
-                $oldPdfPath = public_path($existingCatalog->pdf);
-                if (File::exists($oldPdfPath)) {
-                    File::delete($oldPdfPath);
+                // Eliminar el PDF anterior si existe usando FileStorageService
+                if ($existingCatalog->pdf && FileStorageService::fileExists($existingCatalog->pdf)) {
+                    FileStorageService::deleteFile($existingCatalog->pdf);
                 }
 
                 // Eliminar el catálogo existente
                 $existingCatalog->delete();
             }
 
-            // Guardar el archivo en 'public/storage/catalog'
+            // Guardar el archivo usando FileStorageService
             $file = $request->file('pdf');
             $fileName = str_replace(' ', '_', strtolower($categoryName)) . '_' . time() . '.' . $file->getClientOriginalExtension();
-            $filePath = 'storage/catalog/' . $fileName;
-            $file->move(public_path('storage/catalog'), $fileName);
+            $filePath = FileStorageService::storeFileAs($file, 'storage/catalog/' . $fileName);
 
             // Crear el nuevo catálogo en la base de datos
             $catalog = Catalog::create([

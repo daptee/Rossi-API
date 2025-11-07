@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Helpers\ImageHelper;
+use App\Services\FileStorageService;
 use App\Models\Product;
 use App\Models\WebContentHome;
 use App\Http\Responses\ApiResponse;
@@ -155,18 +156,8 @@ class WebContentHomeController extends Controller
      */
     private function storeFile($file, $directory)
     {
-        // Generar un nombre único para el archivo
-        $uniqueFileName = uniqid() . '_' . time() . '.' . $file->getClientOriginalExtension();
-
-        // Crear el directorio si no existe
-        if (!file_exists($directory)) {
-            mkdir($directory, 0755, true);
-        }
-
-        // Mover el archivo a la carpeta de almacenamiento
-        $file->move($directory, $uniqueFileName);
-
-        return "storage/web_content_home/" . $uniqueFileName;
+        // Use FileStorageService to store the file
+        return FileStorageService::storeFile($file, $directory);
     }
 
     /**
@@ -247,36 +238,27 @@ class WebContentHomeController extends Controller
             if ($request->has('imgSlider')) {
                 foreach ($request->file('imgSlider') as $index => $uploadedFile) {
                     if (isset($decodedData['images'][$index])) {
-                        // Eliminar archivo existente si aplica
+                        // Eliminar archivo existente si aplica usando FileStorageService
                         $existingImage = $decodedData['images'][$index]['img']['url'] ?? null;
                         $existingThumbnailImage = $decodedData['images'][$index]['img']['thumbnail_url'] ?? null;
-                        if ($existingImage && file_exists(public_path($existingImage))) {
-                            unlink(public_path($existingImage));
+                        if ($existingImage && FileStorageService::fileExists($existingImage)) {
+                            FileStorageService::deleteFile($existingImage);
                         }
 
-                        if ($existingThumbnailImage && file_exists(public_path($existingThumbnailImage)) && $existingThumbnailImage != null) {
-                            unlink(public_path($existingThumbnailImage));
+                        if ($existingThumbnailImage && FileStorageService::fileExists($existingThumbnailImage)) {
+                            FileStorageService::deleteFile($existingThumbnailImage);
                         }
 
-                        // Guardar nueva imagen
-                        $uniqueFileName = uniqid() . '_' . time() . '.' . $uploadedFile->getClientOriginalExtension();
+                        // Guardar nueva imagen usando FileStorageService
+                        $newImagePath = FileStorageService::storeFile($uploadedFile, 'storage/web_content_home');
 
                         $newThumbnailImagenPath = ImageHelper::saveReducedImage(
                             $uploadedFile,
                             "storage/web_content_home/",
                         );
 
-                        $directory = public_path('storage/web_content_home');
-                        $path = $directory . '/' . $uniqueFileName;
-
-                        if (!file_exists($directory)) {
-                            mkdir($directory, 0755, true);
-                        }
-
-                        $uploadedFile->move($directory, $uniqueFileName);
-
                         // Actualizar URL en `images`
-                        $decodedData['images'][$index]['img']['url'] = "storage/web_content_home/" . $uniqueFileName;
+                        $decodedData['images'][$index]['img']['url'] = $newImagePath;
                         $decodedData['images'][$index]['img']['thumbnail_url'] = $newThumbnailImagenPath;
                     }
                 }
@@ -302,41 +284,31 @@ class WebContentHomeController extends Controller
             ->first();
 
         if ($existingFile) {
-            $existingFilePath = public_path($existingFile->path);
-            $existingFileThumbnailPath = public_path($existingFile->thumbnail_path);
-            if (file_exists($existingFilePath)) {
-                unlink($existingFilePath);
+            if ($existingFile->path && FileStorageService::fileExists($existingFile->path)) {
+                FileStorageService::deleteFile($existingFile->path);
             }
-            if (file_exists($existingFileThumbnailPath) && $existingFile->thumbnail_path != null) {
-                unlink($existingFileThumbnailPath);
+            if ($existingFile->thumbnail_path && FileStorageService::fileExists($existingFile->thumbnail_path)) {
+                FileStorageService::deleteFile($existingFile->thumbnail_path);
             }
             $existingFile->delete();
         }
 
-        // Guardar nuevo archivo
-        $uniqueFileName = uniqid() . '_' . time() . '.' . $uploadedFile->getClientOriginalExtension();
-        $directory = public_path('storage/web_content_home');
-        $path = $directory . '/' . $uniqueFileName;
-
-        if (!file_exists($directory)) {
-            mkdir($directory, 0755, true);
-        }
-
-        $uploadedFile->move($directory, $uniqueFileName);
+        // Guardar nuevo archivo usando FileStorageService
+        $newFilePath = FileStorageService::storeFile($uploadedFile, 'storage/web_content_home');
 
         // Guardar en base de datos
         WebContentHomeFile::create([
             'id_web_content_home' => $webContent->id,
             'name' => $fileName,
             'type' => $fileType,
-            'path' => "storage/web_content_home/" . $uniqueFileName,
+            'path' => $newFilePath,
             'thumbnail_path' => $thumbnailImagenPath,
         ]);
 
         // Actualizar el JSON
         foreach ($decodedData['files'] as &$fileData) {
             if ($fileData['name'] === $fileName) {
-                $fileData['file'] = "storage/web_content_home/" . $uniqueFileName;
+                $fileData['file'] = $newFilePath;
                 $fileData['thumbnail_file'] = $thumbnailImagenPath;
                 break;
             }

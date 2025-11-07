@@ -6,10 +6,12 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "barryvdh/laravel-dompdf": "^3.1",
         "intervention/image": "^3.11",
         "laravel/framework": "^11.9",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.9",
+        "league/flysystem-aws-s3-v3": "^3.30",
         "php-open-source-saver/jwt-auth": "^2.3"
     },
     "require-dev": {
@@ -35,18 +37,18 @@
     "scripts": {
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
-            "@php artisan package:discover --ansi"
+            "@php -r \"if (!getenv('SKIP_ARTISAN')) { passthru('php artisan package:discover --ansi', $e); exit($e); } else { fwrite(STDOUT, 'Skipping artisan package:discover'.PHP_EOL); }\""
         ],
         "post-update-cmd": [
-            "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
+            "@php -r \"if (!getenv('SKIP_ARTISAN')) { passthru('php artisan vendor:publish --tag=laravel-assets --ansi --force', $e); exit($e); } else { fwrite(STDOUT, 'Skipping artisan vendor:publish'.PHP_EOL); }\""
         ],
         "post-root-package-install": [
-            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
+            "@php -r \"if (getenv('USE_DOTENV')==='true' && !file_exists('.env')) { copy('.env.example', '.env'); fwrite(STDOUT, 'Created .env from .env.example'.PHP_EOL); } else { fwrite(STDOUT, 'Skipping .env creation'.PHP_EOL); }\""
         ],
         "post-create-project-cmd": [
-            "@php artisan key:generate --ansi",
-            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
-            "@php artisan migrate --graceful --ansi"
+            "@php -r \"if (getenv('USE_DOTENV')==='true' && !getenv('SKIP_ARTISAN')) { passthru('php artisan key:generate --ansi', $e); exit($e); } else { fwrite(STDOUT, 'Skipping key:generate'.PHP_EOL); }\"",
+            "@php -r \"if (getenv('USE_SQLITE')==='true') { if (!file_exists('database/database.sqlite')) touch('database/database.sqlite'); }\"",
+            "@php -r \"if (!getenv('SKIP_ARTISAN')) { passthru('php artisan migrate --graceful --ansi', $e); exit($e); } else { fwrite(STDOUT, 'Skipping migrate'.PHP_EOL); }\""
         ]
     },
     "extra": {
@@ -61,6 +63,9 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
+        },
+        "platform": {
+        "php": "8.2.0"
         }
     },
     "minimum-stability": "stable",
