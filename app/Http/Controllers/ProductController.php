@@ -1593,35 +1593,26 @@ class ProductController extends Controller
                 return response()->json(['error' => 'El campo data no contiene un JSON válido.'], 400);
             }
 
-            // Si viene imagen, la guardamos temporalmente para generar el PDF
-            $imagePath = null;
-            $tempImagePath = null;
+            // Si viene imagen, la convertimos a base64 para generar el PDF
+            $imageBase64 = null;
             if ($request->hasFile('image')) {
-                $filename = time() . '_' . $request->file('image')->getClientOriginalName();
+                // Get the uploaded file
+                $uploadedFile = $request->file('image');
 
-                // Store the file using FileStorageService
-                $storedPath = FileStorageService::storeFileAs($request->file('image'), 'storage/pdf-ficha', $filename);
+                // Get the file content and convert to base64
+                $imageContent = file_get_contents($uploadedFile->getPathname());
+                $mimeType = $uploadedFile->getMimeType();
 
-                // For PDF generation, we need the actual file path
-                // If using local storage, get the full path; if S3, download temporarily
-                $disk = Storage::disk(config('filesystems.default'));
+                // Create base64 data URI
+                $imageBase64 = 'data:' . $mimeType . ';base64,' . base64_encode($imageContent);
 
-                if (config('filesystems.default') === 'local' || config('filesystems.default') === 'public') {
-                    // Local storage - get the full path
-                    $imagePath = $disk->path($storedPath);
-                } else {
-                    // S3 or other cloud storage - create a temporary local file
-                    $tempImagePath = sys_get_temp_dir() . '/' . $filename;
-                    file_put_contents($tempImagePath, $disk->get($storedPath));
-                    $imagePath = $tempImagePath;
-                }
+                Log::info('Image converted to base64, size: ' . strlen($imageBase64) . ' characters');
             }
-
             // Datos para la vista Blade
             $data = [
                 'product_title' => $validated['product_title'],
                 'model' => $sections,
-                'image' => $imagePath,
+                'image' => $imageBase64,
             ];
 
             // Generar PDF
@@ -1630,15 +1621,7 @@ class ProductController extends Controller
 
             $pdfOutput = $pdf->output();
 
-            // Eliminar la imagen temporal después de generar el PDF
-            if ($tempImagePath && file_exists($tempImagePath)) {
-                unlink($tempImagePath);
-            }
-
-            // También eliminar el archivo almacenado si es temporal
-            if ($storedPath && config('filesystems.default') !== 'local') {
-                FileStorageService::deleteFile($storedPath);
-            }
+            // No need to clean up temporary files since we're using base64
 
             // Retornar el PDF generado para descarga
             return response($pdfOutput)
