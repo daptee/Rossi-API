@@ -26,6 +26,10 @@ class FileStorageService
 
         $path = $directory . '/' . $filename;
 
+        if (config('app.env') === 'development') {
+            $directory = 'dev/' . $directory;
+        }
+
         // Store the file using the configured filesystem disk
         Storage::disk(config('filesystems.default'))->putFileAs($directory, $file, $filename);
 
