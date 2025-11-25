@@ -37,18 +37,18 @@
     "scripts": {
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
-            "@php -r \"if (!getenv('SKIP_ARTISAN')) { passthru('php artisan package:discover --ansi', $e); exit($e); } else { fwrite(STDOUT, 'Skipping artisan package:discover'.PHP_EOL); }\""
+            "@php artisan package:discover --ansi"
         ],
         "post-update-cmd": [
-            "@php -r \"if (!getenv('SKIP_ARTISAN')) { passthru('php artisan vendor:publish --tag=laravel-assets --ansi --force', $e); exit($e); } else { fwrite(STDOUT, 'Skipping artisan vendor:publish'.PHP_EOL); }\""
+            "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
         ],
         "post-root-package-install": [
-            "@php -r \"if (getenv('USE_DOTENV')==='true' && !file_exists('.env')) { copy('.env.example', '.env'); fwrite(STDOUT, 'Created .env from .env.example'.PHP_EOL); } else { fwrite(STDOUT, 'Skipping .env creation'.PHP_EOL); }\""
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
         ],
         "post-create-project-cmd": [
-            "@php -r \"if (getenv('USE_DOTENV')==='true' && !getenv('SKIP_ARTISAN')) { passthru('php artisan key:generate --ansi', $e); exit($e); } else { fwrite(STDOUT, 'Skipping key:generate'.PHP_EOL); }\"",
-            "@php -r \"if (getenv('USE_SQLITE')==='true') { if (!file_exists('database/database.sqlite')) touch('database/database.sqlite'); }\"",
-            "@php -r \"if (!getenv('SKIP_ARTISAN')) { passthru('php artisan migrate --graceful --ansi', $e); exit($e); } else { fwrite(STDOUT, 'Skipping migrate'.PHP_EOL); }\""
+            "@php artisan key:generate --ansi",
+            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
+            "@php artisan migrate --graceful --ansi"
         ]
     },
     "extra": {
@@ -63,9 +63,6 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
-        },
-        "platform": {
-        "php": "8.2.0"
         }
     },
     "minimum-stability": "stable",

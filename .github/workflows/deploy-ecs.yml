@@ -62,7 +62,14 @@ jobs:
             PUBLIC_SUBNETS=$(aws ec2 describe-subnets \
               --filters "Name=vpc-id,Values=$VPC_ID" "Name=tag:Project,Values=$PROJECT_NAME" \
               --query 'Subnets[?MapPublicIpOnLaunch==`true`].SubnetId' --output text | tr '\t' ',')
-            echo "MIGRATION_SUBNETS=$PUBLIC_SUBNETS" >> $GITHUB_ENV
+
+            # Fallback to current subnets if no public subnets found
+            if [ -z "$PUBLIC_SUBNETS" ] || [ "$PUBLIC_SUBNETS" = "" ]; then
+              echo "No public subnets found, using current service subnets"
+              echo "MIGRATION_SUBNETS=$CURRENT_SUBNETS" >> $GITHUB_ENV
+            else
+              echo "MIGRATION_SUBNETS=$PUBLIC_SUBNETS" >> $GITHUB_ENV
+            fi
           else
             # Use the same subnets as the service (private subnets)
             echo "MIGRATION_SUBNETS=$CURRENT_SUBNETS" >> $GITHUB_ENV
