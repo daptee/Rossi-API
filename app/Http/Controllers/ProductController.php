@@ -483,7 +483,7 @@ class ProductController extends Controller
                 'categories' => 'array',
                 'categories.*' => 'integer|exists:categories,id',
                 'gallery' => 'array',
-                'gallery.*' => 'file|mimes:jpg,jpeg,png,mp4,mov,avi|max:10240',
+                'gallery.*' => 'file|mimes:jpg,jpeg,png,gif,mp4,mov,avi|max:102400',
                 'materials_values' => 'array',
                 'materials_values.*.id_material_value' => 'required|integer|exists:material_values,id',
                 'materials_values.*.img' => 'nullable|file|mimes:jpg,jpeg,png,gif|max:2048',
@@ -588,10 +588,11 @@ class ProductController extends Controller
             if ($request->has('gallery')) {
                 foreach ($request->gallery as $file) {
                     $filePath = FileStorageService::storeFile($file, 'storage/products/gallery');
-                    $fileThumbnailPath = ImageHelper::saveReducedImage(
-                        $file,
-                        "storage/products/gallery/",
-                    );
+                    $extension = strtolower($file->getClientOriginalExtension());
+                    $isStaticImage = \in_array($extension, ['jpg', 'jpeg', 'png']);
+                    $fileThumbnailPath = $isStaticImage
+                        ? ImageHelper::saveReducedImage($file, "storage/products/gallery/")
+                        : null;
                     ProductGallery::create(
                         [
                             'id_product' => $product->id,
@@ -989,10 +990,11 @@ class ProductController extends Controller
 
                         // Guardamos la nueva imagen
                         $newFilePath = FileStorageService::storeFile($galleryItem['file'], 'storage/products/gallery');
-                        $fileThumbnailPath = ImageHelper::saveReducedImage(
-                            $galleryItem['file'],
-                            "storage/products/gallery/",
-                        );
+                        $extension = strtolower($galleryItem['file']->getClientOriginalExtension());
+                        $isStaticImage = \in_array($extension, ['jpg', 'jpeg', 'png']);
+                        $fileThumbnailPath = $isStaticImage
+                            ? ImageHelper::saveReducedImage($galleryItem['file'], "storage/products/gallery/")
+                            : null;
                         $gallery->update(
                             [
                                 'file' => $newFilePath,
@@ -1004,10 +1006,11 @@ class ProductController extends Controller
                     // Si el 'id' está vacío, es una nueva imagen, se sube el archivo
                     if (empty($galleryItem['id']) && isset($galleryItem['file'])) {
                         $newFilePath = FileStorageService::storeFile($galleryItem['file'], 'storage/products/gallery');
-                        $newFileThumbnailPath = ImageHelper::saveReducedImage(
-                            $galleryItem['file'],
-                            "storage/products/gallery/",
-                        );
+                        $extension = strtolower($galleryItem['file']->getClientOriginalExtension());
+                        $isStaticImage = \in_array($extension, ['jpg', 'jpeg', 'png']);
+                        $newFileThumbnailPath = $isStaticImage
+                            ? ImageHelper::saveReducedImage($galleryItem['file'], "storage/products/gallery/")
+                            : null;
                         $product->gallery()->create(
                             [
                                 'file' => $newFilePath,

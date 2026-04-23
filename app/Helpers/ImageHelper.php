@@ -22,6 +22,9 @@ class ImageHelper
 
         // Remove 'storage/' prefix if present to get the actual storage path
         $storagePath = ltrim($path, 'storage/');
+
+        /* $storagePath = preg_replace('#^storage/#', '', $path); */
+        
         $fullStoragePath = $storagePath . $fileName;
 
         $sourcePath = $imageFile->getPathname();
