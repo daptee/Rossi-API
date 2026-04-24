@@ -25,7 +25,15 @@ class ImageHelper
         $fullStoragePath = $storagePath . $fileName;
 
         $sourcePath = $imageFile->getPathname();
-        [$width, $height] = getimagesize($sourcePath);
+        $imageSize = @getimagesize($sourcePath);
+        if ($imageSize === false) {
+            throw new \Exception("El archivo no es una imagen válida: " . $extension);
+        }
+        [$width, $height] = $imageSize;
+
+        if ($width === 0 || $height === 0) {
+            throw new \Exception("El archivo tiene dimensiones inválidas (0px): " . $extension);
+        }
 
         // Nuevo ancho deseado
         $newWidth = 100;
