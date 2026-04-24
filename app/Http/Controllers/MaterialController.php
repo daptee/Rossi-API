@@ -149,9 +149,10 @@ class MaterialController extends Controller
     {
         // Procesar la imagen si existe
         if (isset($valueData['img']) && $valueData['img'] instanceof \Illuminate\Http\UploadedFile) {
-            $valueData['img'] = FileStorageService::storeFile($valueData['img'], 'materials/images');
+            $uploadedFile = $valueData['img'];
+            $valueData['img'] = FileStorageService::storeFile($uploadedFile, 'materials/images');
             $valueData['thumbnail_img'] = ImageHelper::saveReducedImage(
-                $valueData['img'],
+                $uploadedFile,
                 'storage/materials/images/'
             );
         }
@@ -301,9 +302,10 @@ class MaterialController extends Controller
                 }
 
                 // Guardar la nueva imagen
-                $valueData['img'] = FileStorageService::storeFile($valueData['img'], 'materials/images');
+                $uploadedFile = $valueData['img'];
+                $valueData['img'] = FileStorageService::storeFile($uploadedFile, 'materials/images');
                 $valueData['thumbnail_img'] = ImageHelper::saveReducedImage(
-                    $valueData['img'],
+                    $uploadedFile,
                     'storage/materials/images/'
                 );
             }
@@ -313,9 +315,10 @@ class MaterialController extends Controller
         } else {
             // Si es un nuevo valor, procesar la imagen si se proporciona
             if (isset($valueData['img']) && $valueData['img'] instanceof \Illuminate\Http\UploadedFile) {
-                $valueData['img'] = FileStorageService::storeFile($valueData['img'], 'materials/images');
+                $uploadedFile = $valueData['img'];
+                $valueData['img'] = FileStorageService::storeFile($uploadedFile, 'materials/images');
                 $valueData['thumbnail_img'] = ImageHelper::saveReducedImage(
-                    $valueData['img'],
+                    $uploadedFile,
                     'storage/materials/images/'
                 );
             }
