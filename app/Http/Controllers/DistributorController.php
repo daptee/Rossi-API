@@ -199,6 +199,12 @@ class DistributorController extends Controller
                 'phone' => 'required|string|max:20',
                 'email' => 'required|email|max:100',
                 'message' => 'required|string|max:255',
+                'cuit' => 'required|string|max:20',
+                'address' => 'required|string|max:255',
+                'website' => 'nullable|string|max:255',
+                'social_media' => 'nullable|string|max:255',
+                'rossi_products_interest' => 'nullable|string|max:500',
+                'furniture_suppliers' => 'nullable|string|max:500',
             ]);
 
             if ($validator->fails()) {
