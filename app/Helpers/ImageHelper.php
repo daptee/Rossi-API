@@ -20,9 +20,7 @@ class ImageHelper
         $extension = strtolower($imageFile->getClientOriginalExtension());
         $fileName = time() . '_' . Str::random(10) . '_thumbnail.' . $extension;
 
-        // Remove 'storage/' prefix if present to get the actual storage path
-        $storagePath = ltrim($path, 'storage/');
-        $fullStoragePath = $storagePath . $fileName;
+        $fullStoragePath = $path . $fileName;
 
         $sourcePath = $imageFile->getPathname();
         $imageSize = @getimagesize($sourcePath);
@@ -106,6 +104,6 @@ class ImageHelper
         unlink($tempPath);
 
         // Return the path with 'storage/' prefix for consistency with existing code
-        return 'storage/' . $fullStoragePath;
+        return $fullStoragePath;
     }
 }
