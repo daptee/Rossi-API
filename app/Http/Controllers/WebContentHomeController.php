@@ -61,14 +61,15 @@ class WebContentHomeController extends Controller
             $user = JWTAuth::parseToken()->authenticate();
 
             // Validar la solicitud
-            $validator = Validator::make($request->all(), [
-                'data' => 'required|json',
-                'imagen1' => 'required|file|mimes:jpeg,png,jpg',
-                'imagen2' => 'required|file|mimes:jpeg,png,jpg',
-                'video1' => 'required|file|mimes:mp4,mov,avi',
-                'video2' => 'required|file|mimes:mp4,mov,avi',
-                'imgSlider.*' => 'file|mimes:jpeg,png,jpg',
-            ]);
+            $dynamicRules = ['data' => 'required|json', 'imgSlider.*' => 'file|mimes:jpeg,png,jpg'];
+            foreach ($request->allFiles() as $key => $file) {
+                if (preg_match('/^imagen\d+$/', $key)) {
+                    $dynamicRules[$key] = 'required|file|mimes:jpeg,png,jpg';
+                } elseif (preg_match('/^video\d+$/', $key)) {
+                    $dynamicRules[$key] = 'required|file|mimes:mp4,mov,avi,gif';
+                }
+            }
+            $validator = Validator::make($request->all(), $dynamicRules);
 
             if ($validator->fails()) {
                 return ApiResponse::create('Validation failed', 422, $validator->errors());
@@ -88,26 +89,17 @@ class WebContentHomeController extends Controller
                 'data' => $decodedData,
             ]);
 
-            // Procesar y guardar los archivos básicos
-            $files = [
-                ['name' => 'imagen1', 'type' => 'image'],
-                ['name' => 'imagen2', 'type' => 'image'],
-                ['name' => 'video1', 'type' => 'video'],
-                ['name' => 'video2', 'type' => 'video'],
-            ];
-
-            foreach ($files as $file) {
-                if ($request->hasFile($file['name'])) {
-                    $thumbnailImagenPath = null;
-                    $uploadedFile = $request->file($file['name']);
-                    if ($file['name'] == 'imagen1' || $file['name'] == 'imagen2') {
-                        $thumbnailImagenPath = ImageHelper::saveReducedImage(
-                            $uploadedFile,
-                            "storage/web_content_home/",
-                        );
-                    }
+            // Procesar y guardar los archivos dinámicos (imagen1, imagen2, imagen3... / video1, video2, video3...)
+            foreach ($request->allFiles() as $key => $uploadedFile) {
+                if (preg_match('/^imagen\d+$/', $key)) {
+                    $file = ['name' => $key, 'type' => 'image'];
+                    $thumbnailImagenPath = ImageHelper::saveReducedImage($uploadedFile, "storage/web_content_home/");
                     $path = $this->storeFile($uploadedFile, 'storage/web_content_home');
                     $this->updateDecodedData($decodedData, $file, $thumbnailImagenPath, $path, $webContent->id);
+                } elseif (preg_match('/^video\d+$/', $key)) {
+                    $file = ['name' => $key, 'type' => 'video'];
+                    $path = $this->storeFile($uploadedFile, 'storage/web_content_home');
+                    $this->updateDecodedData($decodedData, $file, null, $path, $webContent->id);
                 }
             }
 
@@ -189,14 +181,15 @@ class WebContentHomeController extends Controller
             $user = JWTAuth::parseToken()->authenticate();
 
             // Validar la solicitud
-            $validator = Validator::make($request->all(), [
-                'data' => 'required|json',
-                'imagen1' => 'nullable|file|mimes:jpeg,png,jpg',
-                'imagen2' => 'nullable|file|mimes:jpeg,png,jpg',
-                'video1' => 'nullable|file|mimes:mp4,mov,avi',
-                'video2' => 'nullable|file|mimes:mp4,mov,avi',
-                'imgSlider.*' => 'nullable|file|mimes:jpeg,png,jpg', // Validar múltiples imágenes para el slider
-            ]);
+            $dynamicRules = ['data' => 'required|json', 'imgSlider.*' => 'nullable|file|mimes:jpeg,png,jpg'];
+            foreach ($request->allFiles() as $key => $file) {
+                if (preg_match('/^imagen\d+$/', $key)) {
+                    $dynamicRules[$key] = 'nullable|file|mimes:jpeg,png,jpg';
+                } elseif (preg_match('/^video\d+$/', $key)) {
+                    $dynamicRules[$key] = 'nullable|file|mimes:mp4,mov,avi,gif';
+                }
+            }
+            $validator = Validator::make($request->all(), $dynamicRules);
 
             if ($validator->fails()) {
                 return ApiResponse::create('Validation failed', 422, $validator->errors());
@@ -212,25 +205,13 @@ class WebContentHomeController extends Controller
                 return ApiResponse::create('El campo files es obligatorio y debe ser un array.', 422);
             }
 
-            // Procesar archivos estándar (imagen1, imagen2, video1, video2)
-            $files = [
-                ['name' => 'imagen1', 'type' => 'image'],
-                ['name' => 'imagen2', 'type' => 'image'],
-                ['name' => 'video1', 'type' => 'video'],
-                ['name' => 'video2', 'type' => 'video'],
-            ];
-
-            foreach ($files as $file) {
-                if ($request->hasFile($file['name'])) {
-                    $thumbnailImagenPath = null;
-                    $uploadedFile = $request->file($file['name']);
-                    if ($file['name'] == 'imagen1' || $file['name'] == 'imagen2') {
-                        $thumbnailImagenPath = ImageHelper::saveReducedImage(
-                            $uploadedFile,
-                            "storage/web_content_home/",
-                        );
-                    }
-                    $this->processFile($webContent, $decodedData, $uploadedFile, $thumbnailImagenPath, $file['name'], $file['type']);
+            // Procesar archivos dinámicos (imagen1, imagen2, imagen3... / video1, video2, video3...)
+            foreach ($request->allFiles() as $key => $uploadedFile) {
+                if (preg_match('/^imagen\d+$/', $key)) {
+                    $thumbnailImagenPath = ImageHelper::saveReducedImage($uploadedFile, "storage/web_content_home/");
+                    $this->processFile($webContent, $decodedData, $uploadedFile, $thumbnailImagenPath, $key, 'image');
+                } elseif (preg_match('/^video\d+$/', $key)) {
+                    $this->processFile($webContent, $decodedData, $uploadedFile, null, $key, 'video');
                 }
             }
 

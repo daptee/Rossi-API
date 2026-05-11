@@ -14,6 +14,20 @@
     <p><strong>Teléfono:</strong> {{ $data['phone'] }}</p>
     <p><strong>Email:</strong> {{ $data['email'] }}</p>
     <p><strong>Mensaje:</strong> {{ $data['message'] }}</p>
+    <p><strong>CUIT:</strong> {{ $data['cuit'] }}</p>
+    <p><strong>Dirección:</strong> {{ $data['address'] }}</p>
+    @if(!empty($data['website']))
+    <p><strong>Página web:</strong> {{ $data['website'] }}</p>
+    @endif
+    @if(!empty($data['social_media']))
+    <p><strong>Redes sociales:</strong> {{ $data['social_media'] }}</p>
+    @endif
+    @if(!empty($data['rossi_products_interest']))
+    <p><strong>Productos Rossi de interés:</strong> {{ $data['rossi_products_interest'] }}</p>
+    @endif
+    @if(!empty($data['furniture_suppliers']))
+    <p><strong>Proveedores de mobiliario actuales:</strong> {{ $data['furniture_suppliers'] }}</p>
+    @endif
 	<p>Por favor, no tardes en responderle.<br>Muchas gracias</p>
 	<p>Rossi equipamientos.</p>
 </body>

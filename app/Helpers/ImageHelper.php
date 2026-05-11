@@ -20,12 +20,18 @@ class ImageHelper
         $extension = strtolower($imageFile->getClientOriginalExtension());
         $fileName = time() . '_' . Str::random(10) . '_thumbnail.' . $extension;
 
-        // Remove 'storage/' prefix if present to get the actual storage path
-        $storagePath = ltrim($path, 'storage/');
-        $fullStoragePath = $storagePath . $fileName;
+        $fullStoragePath = $path . $fileName;
 
         $sourcePath = $imageFile->getPathname();
-        [$width, $height] = getimagesize($sourcePath);
+        $imageSize = @getimagesize($sourcePath);
+        if ($imageSize === false) {
+            throw new \Exception("El archivo no es una imagen válida: " . $extension);
+        }
+        [$width, $height] = $imageSize;
+
+        if ($width === 0 || $height === 0) {
+            throw new \Exception("El archivo tiene dimensiones inválidas (0px): " . $extension);
+        }
 
         // Nuevo ancho deseado
         $newWidth = 100;
@@ -98,6 +104,6 @@ class ImageHelper
         unlink($tempPath);
 
         // Return the path with 'storage/' prefix for consistency with existing code
-        return 'storage/' . $fullStoragePath;
+        return $fullStoragePath;
     }
 }
