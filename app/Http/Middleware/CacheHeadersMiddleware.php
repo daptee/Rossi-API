@@ -76,9 +76,9 @@ class CacheHeadersMiddleware
             return 300; // 5 minutes for product listings
         }
 
-        // Web content - 1 hour
+        // Web content - 1 min
         if (str_starts_with($path, 'api/web-content-')) {
-            return 3600;
+            return 60;
         }
 
         // Static data - 2 hours
