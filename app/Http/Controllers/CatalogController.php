@@ -26,11 +26,13 @@ class CatalogController extends Controller
         try {
             ini_set('upload_max_filesize', '50M');
             ini_set('post_max_size', '50M');
-            // Mapeo de nombres en a URL a los nombres correctos
+            
+            // MAPEO
             $categoryMap = [
                 'diseno-y-oficina' => 'Diseño y Oficina',
                 'plasticos' => 'Plasticos',
-                'telas' => 'Telas'
+                'telas' => 'Telas',
+                'tapas' => 'Tapas'
             ];
 
             // Verificar si la categoría existe en el mapa
