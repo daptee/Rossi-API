@@ -6,7 +6,7 @@ COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --no-progress --prefer-dist --no-scripts --optimize-autoloader
 
 # ---- stage: runtime (php-fpm) ----
-FROM php:8.2-fpm-alpine
+FROM php:8.2.35-fpm-alpine
 
 # Extensiones necesarias
 RUN apk add --no-cache icu-dev oniguruma-dev libpng-dev libjpeg-turbo-dev libwebp-dev libzip-dev freetype-dev \
